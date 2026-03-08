@@ -3,6 +3,7 @@ use chrono::{ NaiveDateTime, Duration};
 //Duration, used to have a duration of, say, 30 minutes, 1 hour
 use std::mem::discriminant;
 
+
 ///Main structure to manage tasks and events
 #[derive(Debug, PartialEq)]
 pub struct Manager
@@ -11,7 +12,7 @@ pub struct Manager
     pub events: Vec<Event>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Priority
 {
     One = 1,
