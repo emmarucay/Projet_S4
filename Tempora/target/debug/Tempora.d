@@ -1,0 +1,1 @@
+/home/lisar/Projet_S4/Tempora/target/debug/Tempora: /home/lisar/Projet_S4/Tempora/src/filters.rs /home/lisar/Projet_S4/Tempora/src/logic.rs /home/lisar/Projet_S4/Tempora/src/main.rs /home/lisar/Projet_S4/Tempora/src/models.rs
