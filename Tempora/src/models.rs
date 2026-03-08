@@ -82,22 +82,6 @@ impl Manager
         }
     }
 
-
-    ///Return a list of tasks with a specific priority
-    pub fn get_tasks_by_priority(&self, priority: Priority) -> Vec<&Task>
-    {
-        self.tasks.iter().filter(|t| std::mem::discriminant(&t.priority) == std::mem::discriminant(&priority)).collect()
-    }
-
-    ///Return a list of tasks with a specific deadline
-    pub fn get_tasks_before_deadline(&self, date: NaiveDateTime) -> Vec<&Task>
-    {
-        self.tasks
-            .iter()
-            .filter(|t| t.deadline <= date)
-            .collect()
-    }
-    
     ///Returns tasks that are due in the next hour
     pub fn get_upcoming_tasks(&self, now: NaiveDateTime) -> Vec<&Task>
     {
