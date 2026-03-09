@@ -1,7 +1,6 @@
 use chrono::{ NaiveDateTime, Duration};
 //NaiveDateTime, it's used to have a date and time without worrying about the time zone
 //Duration, used to have a duration of, say, 30 minutes, 1 hour
-use std::mem::discriminant;
 
 
 ///Main structure to manage tasks and events
