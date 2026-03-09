@@ -31,6 +31,7 @@ pub struct Task
     pub priority : Priority,
     pub deadline: NaiveDateTime,
     pub categories: Vec<String>,
+    pub completed: bool,
 }
 
 #[derive(Debug, PartialEq)]

@@ -2,6 +2,7 @@ mod models;
 mod logic;
 mod filters;
 mod ui;
+mod progress;
 use std::io::Write;
 use chrono::{Duration, NaiveDateTime};
 use models::{Manager, Task, Priority};
@@ -86,7 +87,8 @@ fn main() {
         println!("3. Modifier une tâche");
         println!("4. Afficher la liste triée");
         println!("5. Filtrer par catégorie");
-        println!("6. Quitter");
+        println!("6. Voir progression");
+        println!("7. Quitter");
 
         let mut choice = String::new();
         std::io::stdin().read_line(&mut choice).expect("Erreur de lecture");
@@ -141,7 +143,12 @@ fn main() {
                     println!("- {} [{:?}]", t.name, t.priority);
                 }
             }
+
             "6" => {
+    let p = progress::calculate_progress(&manager.tasks);
+    println!("Progression : {:.1}%", p);
+          }
+            "7" => {
                 println!("See you soon !");
                 break; 
             }
