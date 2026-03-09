@@ -12,7 +12,8 @@ pub fn display_task_list(tasks: &[Task]) {
         println!("(Aucune tâche pour le moment)");
     } else {
         for (i, task) in tasks.iter().enumerate() {
-            println!("{}. [{:?}] {}", i + 1, task.priority, task.name);
+            let statut = if task.completed { "Terminée" } else { "À faire" };
+            println!("{}. [{:?}] {} - {}", i + 1, task.priority, task.name, statut);
             println!("   Description : {}", task.description);
             println!("   Deadline : {}", task.deadline);
             println!("   Catégories : {}", task.categories.join(", "));
@@ -87,6 +88,7 @@ pub fn prompt_new_task() -> Task {
         priority,
         deadline,
         categories,
+        completed: false,
     }
 }
 
@@ -157,6 +159,21 @@ pub fn prompt_modify_task(task: &mut Task) {
             .filter(|s| !s.is_empty())
             .collect();
     }
+    print!(
+    "Tâche terminée ? (o/n) [actuelle: {}] : ",
+    if task.completed { "o" } else { "n" }
+);
+io::stdout().flush().unwrap();
+
+let mut done = String::new();
+io::stdin().read_line(&mut done).unwrap();
+
+match done.trim() {
+    "o" | "O" => task.completed = true,
+    "n" | "N" => task.completed = false,
+    "" => {} // rien tapé -> on garde l'ancienne valeur
+    _ => println!("Choix invalide, statut inchangé."),
+}
     
     println!("\n✅ Modification terminée !");
 }
