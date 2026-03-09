@@ -1,7 +1,9 @@
 [package]
-name = "Tempora"
+name = "tempora"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 chrono = "0.4"
+ratatui = "0.26"
+crossterm = "0.27"

@@ -3,156 +3,163 @@ mod logic;
 mod filters;
 mod ui;
 mod progress;
-use std::io::Write;
-use chrono::{Duration, NaiveDateTime};
-use models::{Manager, Task, Priority};
+
+use crossterm::{
+    event::{self, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{backend::CrosstermBackend, Terminal};
+use std::io;
+
+use models::Manager;
 use logic::sort_tasks;
-use filters::filter_by_category;
+use ui::{AppState, Screen};
 
-/*fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
-    println!("Testing Emma's and Lisa's implementations\n");
-
-    // Create the main manager (Emma's structure)
     let mut manager = Manager::new();
-
-    // Add tasks (Emma's add_task function)
-    manager.add_task(Task {
-        name: "Write report".to_string(),
-        description: "Finish the final report".to_string(),
-        duration: Duration::minutes(120),
-        priority: Priority::Three,
-        deadline: NaiveDateTime::parse_from_str("2026-03-20 18:00:00", "%Y-%m-%d %H:%M:%S").unwrap(),
-        categories: vec!["Work".to_string()],
-    });
-
-    manager.add_task(Task {
-        name: "Prepare presentation".to_string(),
-        description: "Create slides".to_string(),
-        duration: Duration::minutes(60),
-        priority: Priority::Five,
-        deadline: NaiveDateTime::parse_from_str("2026-03-15 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap(),
-        categories: vec!["School".to_string(), "Work".to_string()],
-    });
-
-    manager.add_task(Task {
-        name: "Study Rust".to_string(),
-        description: "Practice iterators and closures".to_string(),
-        duration: Duration::minutes(90),
-        priority: Priority::Four,
-        deadline: NaiveDateTime::parse_from_str("2026-03-18 14:00:00", "%Y-%m-%d %H:%M:%S").unwrap(),
-        categories: vec!["School".to_string()],
-    });
-
-    println!("Tasks before sorting:");
-    manager.display_tasks();
-
-    // Lisa's sorting algorithm
-    sort_tasks(&mut manager.tasks);
-
-    println!("\nTasks after sorting (Lisa's algorithm):");
-    manager.display_tasks();
-
-    // Lisa's filtering by category
-    let work_tasks = filter_by_category(&manager.tasks, "Work");
-
-    println!("\nTasks in category 'Work' (Lisa's filter):");
-    for task in work_tasks {
-        println!("{} - {:?}", task.name, task.priority);
-    }
-
-    println!("\nTest completed.");
-
-}*/
-
-fn main() {
-    let mut manager = Manager::new();
-
-    /*tâche par défaut pour tester le tri 
-    manager.add_task(Task {
-        name: "Test Lisa".to_string(),
-        description: "Vérifier le tri".to_string(),
-        duration: Duration::minutes(30),
-        priority: Priority::One,
-        deadline: NaiveDateTime::parse_from_str("2026-03-20 18:00:00", "%Y-%m-%d %H:%M:%S").unwrap(),
-        categories: vec!["Test".to_string()],
-    });*/
-
-    println!("TEMPORA");
+    let mut state   = AppState::new();
+    let mut filter_cat = String::new();
 
     loop {
-        println!("\nMenu :");
-        println!("1. Ajouter une tâche"); //tracy
-        println!("2. Supprimer une tâche");
-        println!("3. Modifier une tâche");
-        println!("4. Afficher la liste triée");
-        println!("5. Filtrer par catégorie");
-        println!("6. Voir progression");
-        println!("7. Quitter");
-
-        let mut choice = String::new();
-        std::io::stdin().read_line(&mut choice).expect("Erreur de lecture");
-
-        match choice.trim() {
-            "1" => {
-                //fct de saisie
-                let new_task = ui::prompt_new_task();
-                manager.add_task(new_task);
-                println!("Tâche ajoutée avec succès !");
+        terminal.draw(|f| {
+            match &state.screen {
+                Screen::Welcome          => ui::draw_welcome(f, &state),
+                Screen::TaskList         => ui::draw_task_list(f, &manager.tasks, &mut state),
+                Screen::FilterByCategory => ui::draw_filter_screen(f, &manager.tasks, &filter_cat),
+                Screen::Stats            => ui::draw_stats(f, &manager.tasks),
+                Screen::AddTask          => {}
             }
+        })?;
 
-            "2" => { //supp
-                ui::display_task_list(&manager.tasks);
-                if let Some(index) = ui::prompt_delete_task(manager.tasks.len()) {
-                    if index < manager.tasks.len() {
-                        manager.tasks.remove(index);
-                        println!("Tâche supprimée !");
+        if let Event::Key(key) = event::read()? {
+            match &state.screen {
+
+                Screen::Welcome => match key.code {
+                    KeyCode::Up   => { if state.selected_menu > 0 { state.selected_menu -= 1; } }
+                    KeyCode::Down => { if state.selected_menu < 4 { state.selected_menu += 1; } }
+                    KeyCode::Enter => match state.selected_menu {
+                        0 => state.screen = Screen::TaskList,
+                        1 => state.screen = Screen::AddTask,
+                        2 => {
+                            disable_raw_mode()?;
+                            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                            print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
+                            io::Write::flush(&mut io::stdout())?;
+                            let mut cat = String::new();
+                            io::BufRead::read_line(&mut io::BufReader::new(io::stdin()), &mut cat)?;
+                            filter_cat = cat.trim().to_string();
+                            enable_raw_mode()?;
+                            execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                            terminal.clear()?;
+                            state.screen = Screen::FilterByCategory;
+                        }
+                        3 => state.screen = Screen::Stats,
+                        4 => break,
+                        _ => {}
+                    },
+                    KeyCode::Char('q') => break,
+                    _ => {}
+                },
+
+                Screen::TaskList => match key.code {
+                    KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::Welcome,
+                    KeyCode::Char('q') => break,
+
+                    KeyCode::Up => {
+                        let sel = state.list_state.selected().unwrap_or(0);
+                        if sel > 0 { state.list_state.select(Some(sel - 1)); }
                     }
-                }
-            }
-
-
-            "3" => {
-                ui::display_task_list(&manager.tasks);
-                print!("Index de la tâche à modifier : ");
-                std::io::stdout().flush().unwrap();
-                let mut idx_str = String::new();
-                std::io::stdin().read_line(&mut idx_str).unwrap();
-        
-                if let Ok(idx) = idx_str.trim().parse::<usize>() {
-                    if let Some(tache) = manager.tasks.get_mut(idx - 1) {
-                        ui::prompt_modify_task(tache);
-                        println!("Tâche mise à jour !");
+                    KeyCode::Down => {
+                        let sel = state.list_state.selected().unwrap_or(0);
+                        if sel + 1 < manager.tasks.len() { state.list_state.select(Some(sel + 1)); }
                     }
-                }
-            }
-            
-            "4" => {
-                //algo lisa
-                sort_tasks(&mut manager.tasks);
-                //list view
-                ui::display_task_list(&manager.tasks);
-            }
-            "5" => {
-                println!("Entrez la catégorie à filtrer :");
-                let mut cat = String::new();
-                std::io::stdin().read_line(&mut cat).expect("Erreur de lecture");
-                let resultats = filter_by_category(&manager.tasks, cat.trim());
-                println!("\n--- Résultats du filtre ---");
-                for t in resultats {
-                    println!("- {} [{:?}]", t.name, t.priority);
-                }
-            }
 
-            "6" => {
-    let p = progress::calculate_progress(&manager.tasks);
-    println!("Progression : {:.1}%", p);
-          }
-            "7" => {
-                println!("See you soon !");
-                break; 
+                    KeyCode::Char('a') => state.screen = Screen::AddTask,
+
+                    KeyCode::Char('s') => {
+                        sort_tasks(&mut manager.tasks);
+                        state.list_state.select(Some(0));
+                    }
+
+                    KeyCode::Char('f') => {
+                        disable_raw_mode()?;
+                        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                        print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
+                        io::Write::flush(&mut io::stdout())?;
+                        let mut cat = String::new();
+                        io::stdin().read_line(&mut cat)?;
+                        filter_cat = cat.trim().to_string();
+                        enable_raw_mode()?;
+                        execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                        terminal.clear()?;
+                        state.screen = Screen::FilterByCategory;
+                    }
+
+                    KeyCode::Char('e') => {
+                        if let Some(idx) = state.list_state.selected() {
+                            if idx < manager.tasks.len() {
+                                disable_raw_mode()?;
+                                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                                ui::prompt_modify_task_tui(&mut manager.tasks[idx]);
+                                enable_raw_mode()?;
+                                execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                                terminal.clear()?;
+                            }
+                        }
+                    }
+
+                    // Espace = marquer terminée/à faire (feature Farah)
+                    KeyCode::Char(' ') => {
+                        if let Some(idx) = state.list_state.selected() {
+                            if idx < manager.tasks.len() {
+                                manager.tasks[idx].completed = !manager.tasks[idx].completed;
+                            }
+                        }
+                    }
+
+                    KeyCode::Delete | KeyCode::Backspace => {
+                        if let Some(idx) = state.list_state.selected() {
+                            if idx < manager.tasks.len() {
+                                manager.tasks.remove(idx);
+                                let new_sel = if idx > 0 { idx - 1 } else { 0 };
+                                state.list_state.select(if manager.tasks.is_empty() { None } else { Some(new_sel) });
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+
+                Screen::AddTask => {
+                    disable_raw_mode()?;
+                    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                    if let Some(task) = ui::prompt_new_task_tui() {
+                        manager.add_task(task);
+                    }
+                    enable_raw_mode()?;
+                    execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                    terminal.clear()?;
+                    state.screen = Screen::TaskList;
+                }
+
+                Screen::FilterByCategory | Screen::Stats => match key.code {
+                    KeyCode::Esc | KeyCode::Char('b') | KeyCode::Char('q') => {
+                        state.screen = Screen::TaskList;
+                    }
+                    _ => {}
+                },
             }
-            _ => println!("Choix invalide, réessaie."),
         }
     }
+
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    println!("  See you soon ! 🌸");
+    Ok(())
 }
