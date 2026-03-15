@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         2 => {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                            print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
+                            print!("\n  \x1b[35mCategory to filter\x1b[0m : ");
                             io::Write::flush(&mut io::stdout())?;
                             let mut cat = String::new();
                             io::BufRead::read_line(&mut io::BufReader::new(io::stdin()), &mut cat)?;
@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                   KeyCode::Char('f') => {
                         disable_raw_mode()?;
                         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                        print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
+                        print!("\n  \x1b[35mCategory to filter\x1b[0m : ");
                         io::Write::flush(&mut io::stdout())?;
                         let mut cat = String::new();
                         io::stdin().read_line(&mut cat)?;
