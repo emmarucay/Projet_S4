@@ -3,7 +3,7 @@
 
 use crate::models::Task;
 
-
+#[allow(dead_code)]
 pub fn calculate_progress(tasks: &[Task]) -> f32 {//calculates the pourcentage of tasks that have
                                                   //been done by dividing them by the total of
                                                   //tasks 

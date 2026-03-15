@@ -22,6 +22,7 @@ const SOFT:       Color = Color::LightMagenta;
 const MUTED:      Color = Color::DarkGray;
 const WHITE:      Color = Color::White;
 const LAVENDER:   Color = Color::LightBlue;
+#[allow(dead_code)]
 const BG:         Color = Color::Reset;
 
 // ─── APP STATE ───────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ fn priority_dot(p: &Priority) -> &'static str {
         Priority::Two  | Priority::One                    => "○",
     }
 }
-
+#[allow(dead_code)]
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -99,6 +100,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 // ─── WELCOME SCREEN ───────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     let area = f.size();
 
@@ -200,6 +202,7 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
 }
 
 // ─── TASK LIST SCREEN ────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
     let area = f.size();
 
@@ -318,6 +321,7 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
 // Interactive input stays in text mode (stdin) because ratatui and stdin
 // don't mix easily without an async lib. We exit raw mode,
 // read input, then come back.
+#[allow(dead_code)]
 pub fn prompt_new_task_tui() -> Option<Task> {
     // Temporarily exit raw mode to read from terminal
     disable_raw_mode().ok();
@@ -358,6 +362,7 @@ pub fn prompt_new_task_tui() -> Option<Task> {
 }
 
 // ─── MODIFIER UNE TÂCHE ──────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn prompt_modify_task_tui(task: &mut Task) {
     disable_raw_mode().ok();
     execute!(io::stdout(), LeaveAlternateScreen).ok();
@@ -392,6 +397,7 @@ pub fn prompt_modify_task_tui(task: &mut Task) {
 }
 
 // ─── FILTER SCREEN ───────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
     let area = f.size();
     let chunks = Layout::default()
@@ -449,6 +455,7 @@ pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
 }
 
 // ─── STATS SCREEN ────────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
     let area = f.size();
 
@@ -474,7 +481,7 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
         .collect();
 
     // Progression (feature Farah)
-    let progression = if total > 0 { (terminees as f64 / total as f64) * 100.0 } else { 0.0 };
+   let _progression = if total > 0 { (terminees as f64 / total as f64) * 100.0 } else { 0.0 };
 
     let prio_counts: Vec<(String, usize, Color)> = vec![
         ("★★★★★ Urgent ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Five)).count(), DEEP_PINK),
@@ -556,6 +563,7 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
 }
 
 // ─── UTILITY FUNCTIONS ───────────────────────────────────────────────────────
+#[allow(dead_code)]
 fn read_field(prompt: &str, default: Option<&str>) -> String {
     print!("\x1b[35m{}\x1b[0m : ", prompt);
     io::stdout().flush().unwrap();
@@ -602,7 +610,7 @@ fn restore_tui() {
 // ─── BACKWARD-COMPATIBLE WRAPPERS ────────────────────────────────────────────
 // These wrappers allow main.rs to keep calling the old signatures
 // without breaking anything.
-
+#[allow(dead_code)]
 pub fn display_task_list(tasks: &[Task]) {
     // Text fallback if ratatui is not available
     println!("  \x1b[35m✦ MY TASK LIST\x1b[0m");
@@ -618,7 +626,7 @@ pub fn display_task_list(tasks: &[Task]) {
         println!();
     }
 }
-
+#[allow(dead_code)]
 pub fn prompt_new_task() -> Task {
     prompt_new_task_tui().unwrap_or_else(|| Task {
         name: "Untitled".to_string(),
@@ -630,7 +638,7 @@ pub fn prompt_new_task() -> Task {
         completed: false,
     })
 }
-
+#[allow(dead_code)]
 pub fn prompt_delete_task(max: usize) -> Option<usize> {
     if max == 0 {
         println!("Aucune tâche à supprimer.");

@@ -60,7 +60,7 @@ impl Manager
     {
         self.tasks.push(task);
     }
-
+    #[allow(dead_code)]
     ///Adds a new event to manager
     pub fn add_event(&mut self, event: Event) -> Result<(), String>
     {
@@ -74,7 +74,7 @@ impl Manager
             Err("The event must end after it has started.".to_string())
         }
     }
-
+    #[allow(dead_code)]
     pub fn display_tasks(&self)
     {
         for (i, task) in self.tasks.iter().enumerate()
@@ -82,7 +82,7 @@ impl Manager
             println!("{}: {} (Priority: {:?}) - Due: {}", i+1, task.name, task.priority, task.deadline);
         }
     }
-
+    #[allow(dead_code)]
     ///Returns tasks that are due in the next hour
     pub fn get_upcoming_tasks(&self, now: NaiveDateTime) -> Vec<&Task>
     {

@@ -14,6 +14,7 @@ pub fn filter_by_category<'a>(tasks: &'a [Task], wanted_category: &str) -> Vec<&
 
 // Generic filtering function using a closure
 // This allows filtering tasks using any condition
+#[allow(dead_code)]
 pub fn filter_tasks<F>(tasks: &[Task], predicate: F) -> Vec<&Task>
 where
     F: Fn(&Task) -> bool,
