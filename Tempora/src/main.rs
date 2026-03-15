@@ -58,7 +58,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             enable_raw_mode()?;
                             execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                             terminal.clear()?;
-                            state.screen = Screen::FilterByCategory;
+
+                            if filter_cat.is_empty() {
+                                state.screen = Screen::TaskList;
+                            } else {
+                                state.screen = Screen::FilterByCategory;
+                            }
                         }
                         3 => state.screen = Screen::Stats,
                         4 => break,
@@ -85,10 +90,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     KeyCode::Char('s') => {
                         sort_tasks(&mut manager.tasks);
-                        state.list_state.select(Some(0));
+                        if manager.tasks.is_empty() {
+                            state.list_state.select(None);
+                        } else {
+                            state.list_state.select(Some(0));
+                        }
                     }
 
-                    KeyCode::Char('f') => {
+                  KeyCode::Char('f') => {
                         disable_raw_mode()?;
                         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
                         print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
@@ -99,7 +108,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         enable_raw_mode()?;
                         execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                         terminal.clear()?;
-                        state.screen = Screen::FilterByCategory;
+
+                        if filter_cat.is_empty() { //secure test
+                            state.screen = Screen::TaskList;
+                        } else {
+                            state.screen = Screen::FilterByCategory;
+                        }
                     }
 
                     KeyCode::Char('e') => {

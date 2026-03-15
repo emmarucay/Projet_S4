@@ -231,12 +231,12 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
             Line::from(vec![Span::styled(
                 "  🌸  No tasks yet",
                 Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
-            )),
+            )]),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "  Press 'a' to add one!",
                 Style::default().fg(SOFT),
-            )),
+            )]),
         ])
         .block(Block::default().borders(Borders::NONE));
         f.render_widget(empty, chunks[1]);
@@ -571,14 +571,17 @@ fn read_priority() -> Priority {
     let val = read_field("  Your choice", Some("3"));
     parse_priority(&val)
 }
-
 fn parse_priority(s: &str) -> Priority {
     match s.trim() {
         "5" => Priority::Five,
         "4" => Priority::Four,
+        "3" => Priority::Three,
         "2" => Priority::Two,
         "1" => Priority::One,
-        _   => Priority::Three,
+        _ => {
+            println!("  \x1b[90mInvalid priority → using default priority 3\x1b[0m");  //test securitaire
+            Priority::Three
+        }
     }
 }
 
@@ -629,10 +632,26 @@ pub fn prompt_new_task() -> Task {
 }
 
 pub fn prompt_delete_task(max: usize) -> Option<usize> {
-    if max == 0 { return None; }
+    if max == 0 {
+        println!("Aucune tâche à supprimer.");
+        return None;
+    }
+
     print!("  \x1b[35mIndex to delete (1-{})\x1b[0m : ", max);
     io::stdout().flush().unwrap();
+
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    input.trim().parse::<usize>().ok().map(|i| i - 1)
+
+    match input.trim().parse::<usize>() {
+        Ok(i) if i >= 1 && i <= max => Some(i - 1),
+        Ok(_) => {
+            println!("Index hors limites.");
+            None
+        }
+        Err(_) => {
+            println!("Veuillez entrer un nombre valide.");
+            None
+        }
+    }
 }

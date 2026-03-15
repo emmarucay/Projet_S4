@@ -22,3 +22,40 @@ where
         .filter(|task| predicate(task))
         .collect()
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Priority, Task};
+    use chrono::{Duration, NaiveDateTime};
+
+    #[test]
+    fn test_filter_by_category_work() {
+        let tasks = vec![
+            Task {
+                name: "Rapport".to_string(),
+                description: "Finir le rapport".to_string(),
+                duration: Duration::minutes(60),
+                priority: Priority::Three,
+                deadline: NaiveDateTime::parse_from_str("2026-03-20 18:00", "%Y-%m-%d %H:%M").unwrap(),
+                categories: vec!["Work".to_string(), "School".to_string()],
+                completed: false,
+            },
+            Task {
+                name: "Courses".to_string(),
+                description: "Acheter du lait".to_string(),
+                duration: Duration::minutes(20),
+                priority: Priority::One,
+                deadline: NaiveDateTime::parse_from_str("2026-03-21 10:00", "%Y-%m-%d %H:%M").unwrap(),
+                categories: vec!["Perso".to_string()],
+                completed: false,
+            },
+        ];
+
+        let result = filter_by_category(&tasks, "Work");
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "Rapport");
+    }
+}
