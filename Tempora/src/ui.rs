@@ -12,16 +12,19 @@ use crossterm::{
 use std::io::{self, Write};
 use chrono::{Duration, NaiveDateTime};
 use crate::models::{Task, Priority};
+use crate::filters::filter_by_category;
 
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
-const PINK:      Color = Color::Magenta;
-const DEEP_PINK: Color = Color::Red;
-const SOFT:      Color = Color::LightMagenta;
-const MUTED:     Color = Color::DarkGray;
-const WHITE:     Color = Color::White;
-const LAVENDER:  Color = Color::LightBlue;
+// Simulating a pink vibe with available terminal colors
+const PINK:       Color = Color::Magenta;
+const DEEP_PINK:  Color = Color::Red;       // for urgent tasks
+const SOFT:       Color = Color::LightMagenta;
+const MUTED:      Color = Color::DarkGray;
+const WHITE:      Color = Color::White;
+const LAVENDER:   Color = Color::LightBlue;
+const BG:         Color = Color::Reset;
 
-// ─── ÉTAT DE L'APP ───────────────────────────────────────────────────────────
+// ─── APP STATE ───────────────────────────────────────────────────────────────
 pub enum Screen {
     Welcome,
     TaskList,
@@ -33,7 +36,7 @@ pub enum Screen {
 pub struct AppState {
     pub screen: Screen,
     pub list_state: ListState,
-    pub selected_menu: usize,
+    pub selected_menu: usize,   // welcome menu index
 }
 
 impl AppState {
@@ -48,7 +51,7 @@ impl AppState {
     }
 }
 
-// ─── HELPERS DE STYLE ────────────────────────────────────────────────────────
+// ─── STYLE HELPERS ───────────────────────────────────────────────────────────
 fn priority_color(p: &Priority) -> Color {
     match p {
         Priority::Five  => DEEP_PINK,
@@ -61,11 +64,11 @@ fn priority_color(p: &Priority) -> Color {
 
 fn priority_label(p: &Priority) -> &'static str {
     match p {
-        Priority::Five  => "★★★★★ Urgente",
-        Priority::Four  => "★★★★☆ Haute",
-        Priority::Three => "★★★☆☆ Moyenne",
-        Priority::Two   => "★★☆☆☆ Basse",
-        Priority::One   => "★☆☆☆☆ Mini",
+        Priority::Five  => "★★★★★ Urgent",
+        Priority::Four  => "★★★★☆ High",
+        Priority::Three => "★★★☆☆ Medium",
+        Priority::Two   => "★★☆☆☆ Low",
+        Priority::One   => "★☆☆☆☆ Minimal",
     }
 }
 
@@ -95,10 +98,11 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-// ─── ÉCRAN DE BIENVENUE ──────────────────────────────────────────────────────
+// ─── WELCOME SCREEN ───────────────────────────────────────────────────────────
 pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     let area = f.size();
 
+    // Layout: title at top, options in middle, footer at bottom
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -108,6 +112,7 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
         ])
         .split(area);
 
+    // ── TITLE ──
     let title_text = vec![
         Line::from(""),
         Line::from(vec![
@@ -116,7 +121,12 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
             Span::styled("  ✦  ", Style::default().fg(SOFT)),
         ]),
         Line::from(""),
-        Line::from(Span::styled("  Ton organisateur personnel  ", Style::default().fg(MUTED))),
+        Line::from(vec![
+            Span::styled(
+                "  Your personal organizer  ",
+                Style::default().fg(MUTED),
+            ),
+        ]),
         Line::from(""),
         Line::from(Span::styled("  · · · · · · · · · · · · · · · · · · · ·  ", Style::default().fg(SOFT))),
     ];
@@ -127,11 +137,11 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     f.render_widget(title, chunks[0]);
 
     let menu_items = vec![
-        ("  ✅  Mes tâches       ", "Voir, trier et gérer tes tâches"),
-        ("  ✍   Ajouter         ", "Créer une nouvelle tâche"),
-        ("  🔍  Filtrer          ", "Trouver par catégorie"),
-        ("  📊  Stats            ", "Ta progression"),
-        ("  ✕   Quitter          ", ""),
+        ("  ✅  My tasks        ", "View, sort and manage your tasks"),
+        ("  ✍   Add             ", "Create a new task"),
+        ("  🔍  Filter           ", "Find by category"),
+        ("  📊  Stats            ", "Your progress"),
+        ("  ✕   Quit             ", ""),
     ];
 
     let cols = Layout::default()
@@ -175,9 +185,9 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     let footer = Paragraph::new(vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("  ↑↓ naviguer  ", Style::default().fg(MUTED)),
-            Span::styled("  Entrée sélectionner  ", Style::default().fg(SOFT)),
-            Span::styled("  q quitter  ", Style::default().fg(MUTED)),
+            Span::styled("  ↑↓ navigate  ", Style::default().fg(MUTED)),
+            Span::styled("  Enter select  ", Style::default().fg(SOFT)),
+            Span::styled("  q quit  ", Style::default().fg(MUTED)),
         ]),
         Line::from(""),
         Line::from(Span::styled(
@@ -189,41 +199,42 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     f.render_widget(footer, chunks[2]);
 }
 
-// ─── ÉCRAN LISTE DE TÂCHES ───────────────────────────────────────────────────
+// ─── TASK LIST SCREEN ────────────────────────────────────────────────────────
 pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
     let area = f.size();
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Min(0),
-            Constraint::Length(3),
+            Constraint::Length(3),   // header
+            Constraint::Min(0),      // list
+            Constraint::Length(3),   // footer
         ])
         .split(area);
 
     let header = Paragraph::new(vec![Line::from(vec![
         Span::styled("  ✦ TEMPORA  ", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
         Span::styled("›  ", Style::default().fg(MUTED)),
-        Span::styled("Mes tâches", Style::default().fg(WHITE).add_modifier(Modifier::BOLD)),
+        Span::styled("My tasks", Style::default().fg(WHITE).add_modifier(Modifier::BOLD)),
         Span::styled(
-            format!("  ({} tâche{})", tasks.len(), if tasks.len() > 1 { "s" } else { "" }),
+            format!("  ({} task{})", tasks.len(), if tasks.len() > 1 { "s" } else { "" }),
             Style::default().fg(MUTED),
         ),
     ])])
     .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(SOFT)));
     f.render_widget(header, chunks[0]);
 
+    // List
     if tasks.is_empty() {
         let empty = Paragraph::new(vec![
             Line::from(""),
-            Line::from(Span::styled(
-                "  🌸  Aucune tâche pour le moment",
+            Line::from(vec![Span::styled(
+                "  🌸  No tasks yet",
                 Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
             )),
             Line::from(""),
-            Line::from(Span::styled(
-                "  Appuie sur 'a' pour en ajouter une !",
+            Line::from(vec![Span::styled(
+                "  Press 'a' to add one!",
                 Style::default().fg(SOFT),
             )),
         ])
@@ -291,28 +302,32 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
     }
 
     let footer = Paragraph::new(Line::from(vec![
-        Span::styled("  a ajouter  ", Style::default().fg(MUTED)),
-        Span::styled("  s trier  ", Style::default().fg(MUTED)),
-        Span::styled("  f filtrer  ", Style::default().fg(MUTED)),
-        Span::styled("  e modifier  ", Style::default().fg(MUTED)),
-        Span::styled("  espace ✓  ", Style::default().fg(SOFT)),
-        Span::styled("  suppr supprimer  ", Style::default().fg(MUTED)),
-        Span::styled("  esc retour  ", Style::default().fg(MUTED)),
+        Span::styled("  a add  ", Style::default().fg(MUTED)),
+        Span::styled("  s sort  ", Style::default().fg(MUTED)),
+        Span::styled("  f filter  ", Style::default().fg(MUTED)),
+        Span::styled("  e edit  ", Style::default().fg(MUTED)),
+        Span::styled("  del delete  ", Style::default().fg(MUTED)),
+        Span::styled("  esc back  ", Style::default().fg(MUTED)),
     ]))
     .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
     f.render_widget(footer, chunks[2]);
 }
 
-// ─── AJOUTER UNE TÂCHE ───────────────────────────────────────────────────────
+// ─── POPUP: ADD A TASK ───────────────────────────────────────────────────────
+// This function displays a recap in a popup after classic text input.
+// Interactive input stays in text mode (stdin) because ratatui and stdin
+// don't mix easily without an async lib. We exit raw mode,
+// read input, then come back.
 pub fn prompt_new_task_tui() -> Option<Task> {
+    // Temporarily exit raw mode to read from terminal
     disable_raw_mode().ok();
     execute!(io::stdout(), LeaveAlternateScreen).ok();
 
     println!();
-    println!("  \x1b[35m✦  NOUVELLE TÂCHE\x1b[0m");
+    println!("  \x1b[35m✦  NEW TASK\x1b[0m");
     println!("  \x1b[90m─────────────────────────────\x1b[0m");
 
-    let name = read_field("  Nom de la tâche", None);
+    let name = read_field("  Task name", None);
     if name.is_empty() {
         restore_tui();
         return None;
@@ -320,7 +335,7 @@ pub fn prompt_new_task_tui() -> Option<Task> {
 
     let desc  = read_field("  Description", None);
     let prio  = read_priority();
-    let cats  = read_field("  Catégories (séparées par ,)", Some("Général"));
+    let cats  = read_field("  Categories (comma-separated)", Some("General"));
     let date  = read_deadline();
 
     let categories: Vec<String> = cats
@@ -348,49 +363,35 @@ pub fn prompt_modify_task_tui(task: &mut Task) {
     execute!(io::stdout(), LeaveAlternateScreen).ok();
 
     println!();
-    println!("  \x1b[35m✦  MODIFIER : {}\x1b[0m", task.name);
+    println!("  \x1b[35m✦  EDIT: {}\x1b[0m", task.name);
     println!("  \x1b[90m─────────────────────────────\x1b[0m");
-    println!("  \x1b[90m(Entrée = conserver la valeur actuelle)\x1b[0m");
+    println!("  \x1b[90m(Enter = keep current value)\x1b[0m");
     println!();
 
-    let new_name = read_field(&format!("  Nom [{}]", task.name), None);
+    let new_name = read_field(&format!("  Name [{}]", task.name), None);
     if !new_name.is_empty() { task.name = new_name; }
 
     let new_desc = read_field(&format!("  Description [{}]", task.description), None);
     if !new_desc.is_empty() { task.description = new_desc; }
 
-    println!("  Priorité actuelle : \x1b[35m{}\x1b[0m", priority_label(&task.priority));
-    let new_prio_str = read_field("  Nouvelle priorité (1-5, Entrée = garder)", None);
+    println!("  Current priority: \x1b[35m{}\x1b[0m", priority_label(&task.priority));
+    let new_prio_str = read_field("  New priority (1-5, Enter = keep)", None);
     if !new_prio_str.is_empty() {
         task.priority = parse_priority(&new_prio_str);
     }
 
     let cats_str = task.categories.join(", ");
-    let new_cats = read_field(&format!("  Catégories [{}]", cats_str), None);
+    let new_cats = read_field(&format!("  Categories [{}]", cats_str), None);
     if !new_cats.is_empty() {
         task.categories = new_cats.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
     }
 
-    // Statut terminée (feature Farah)
-    print!(
-        "  \x1b[35mTâche terminée ? (o/n) [{}]\x1b[0m : ",
-        if task.completed { "o" } else { "n" }
-    );
-    io::stdout().flush().unwrap();
-    let mut done = String::new();
-    io::stdin().read_line(&mut done).unwrap();
-    match done.trim() {
-        "o" | "O" => task.completed = true,
-        "n" | "N" => task.completed = false,
-        _ => {}
-    }
-
-    println!("\n  \x1b[35m✦ Tâche modifiée !\x1b[0m");
+    println!("\n  \x1b[35m✦ Task updated!\x1b[0m");
     std::thread::sleep(std::time::Duration::from_millis(800));
     restore_tui();
 }
 
-// ─── ÉCRAN FILTRE ────────────────────────────────────────────────────────────
+// ─── FILTER SCREEN ───────────────────────────────────────────────────────────
 pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
     let area = f.size();
     let chunks = Layout::default()
@@ -401,22 +402,19 @@ pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
     let header = Paragraph::new(Line::from(vec![
         Span::styled("  ✦ TEMPORA  ", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
         Span::styled("›  ", Style::default().fg(MUTED)),
-        Span::styled("Filtre : ", Style::default().fg(WHITE)),
+        Span::styled("Filter: ", Style::default().fg(WHITE)),
         Span::styled(category, Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
     ]))
     .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(SOFT)));
     f.render_widget(header, chunks[0]);
 
-    let filtered: Vec<&Task> = tasks
-        .iter()
-        .filter(|t| t.categories.iter().any(|c| c.to_lowercase() == category.to_lowercase()))
-        .collect();
+    let filtered = filter_by_category(tasks, category);
 
     if filtered.is_empty() {
         let empty = Paragraph::new(vec![
             Line::from(""),
             Line::from(Span::styled(
-                format!("  Aucune tâche dans la catégorie «{}»", category),
+                format!("  No tasks in category «{}»", category),
                 Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
             )),
         ]);
@@ -442,12 +440,15 @@ pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
         f.render_widget(list, chunks[1]);
     }
 
-    let footer = Paragraph::new(Line::from(Span::styled("  esc retour", Style::default().fg(MUTED))))
-        .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
+    let footer = Paragraph::new(Line::from(Span::styled(
+        "  esc back",
+        Style::default().fg(MUTED),
+    )))
+    .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
     f.render_widget(footer, chunks[2]);
 }
 
-// ─── ÉCRAN STATS ─────────────────────────────────────────────────────────────
+// ─── STATS SCREEN ────────────────────────────────────────────────────────────
 pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
     let area = f.size();
 
@@ -476,11 +477,11 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
     let progression = if total > 0 { (terminees as f64 / total as f64) * 100.0 } else { 0.0 };
 
     let prio_counts: Vec<(String, usize, Color)> = vec![
-        ("★★★★★ Urgente".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Five)).count(),  DEEP_PINK),
-        ("★★★★☆ Haute  ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Four)).count(),  Color::LightRed),
-        ("★★★☆☆ Moyenne".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Three)).count(), PINK),
-        ("★★☆☆☆ Basse  ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Two)).count(),   SOFT),
-        ("★☆☆☆☆ Mini   ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::One)).count(),   MUTED),
+        ("★★★★★ Urgent ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Five)).count(), DEEP_PINK),
+        ("★★★★☆ High   ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Four)).count(), Color::LightRed),
+        ("★★★☆☆ Medium ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Three)).count(), PINK),
+        ("★★☆☆☆ Low    ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Two)).count(), SOFT),
+        ("★☆☆☆☆ Minimal".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::One)).count(), MUTED),
     ];
 
     let content_chunks = Layout::default()
@@ -488,27 +489,22 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[1]);
 
+    // ── Key figures ──
     let stats_text = vec![
         Line::from(""),
         Line::from(vec![
             Span::styled("  Total        ", Style::default().fg(MUTED)),
             Span::styled(format!("{}", total), Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
-            Span::styled(" tâches", Style::default().fg(MUTED)),
+            Span::styled(" task(s)", Style::default().fg(MUTED)),
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Terminées    ", Style::default().fg(MUTED)),
-            Span::styled(format!("{}", terminees), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-            Span::styled(format!("  ({:.0}%)", progression), Style::default().fg(MUTED)),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  Urgentes     ", Style::default().fg(MUTED)),
+            Span::styled("  Urgent      ", Style::default().fg(MUTED)),
             Span::styled(format!("{}", urgentes), Style::default().fg(DEEP_PINK).add_modifier(Modifier::BOLD)),
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Catégories   ", Style::default().fg(MUTED)),
+            Span::styled("  Categories  ", Style::default().fg(MUTED)),
             Span::styled(format!("{}", categories.len()), Style::default().fg(SOFT).add_modifier(Modifier::BOLD)),
         ]),
     ];
@@ -519,10 +515,11 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(SOFT))
-                .title(Span::styled(" Résumé ", Style::default().fg(PINK))),
+                .title(Span::styled(" Summary ", Style::default().fg(PINK))),
         );
     f.render_widget(stats_widget, content_chunks[0]);
 
+    // ── Priority bars ──
     let bar_width = content_chunks[1].width.saturating_sub(6) as usize;
     let mut bar_lines = vec![Line::from("")];
 
@@ -546,16 +543,19 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(SOFT))
-                .title(Span::styled(" Répartition par priorité ", Style::default().fg(PINK))),
+                .title(Span::styled(" Breakdown by priority ", Style::default().fg(PINK))),
         );
     f.render_widget(bars_widget, content_chunks[1]);
 
-    let footer = Paragraph::new(Line::from(Span::styled("  esc retour", Style::default().fg(MUTED))))
-        .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
+    let footer = Paragraph::new(Line::from(Span::styled(
+        "  esc back",
+        Style::default().fg(MUTED),
+    )))
+    .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
     f.render_widget(footer, chunks[2]);
 }
 
-// ─── UTILITAIRES ─────────────────────────────────────────────────────────────
+// ─── UTILITY FUNCTIONS ───────────────────────────────────────────────────────
 fn read_field(prompt: &str, default: Option<&str>) -> String {
     print!("\x1b[35m{}\x1b[0m : ", prompt);
     io::stdout().flush().unwrap();
@@ -566,9 +566,9 @@ fn read_field(prompt: &str, default: Option<&str>) -> String {
 }
 
 fn read_priority() -> Priority {
-    println!("  \x1b[90mPriorité :\x1b[0m");
-    println!("  \x1b[31m5\x1b[0m Urgente  \x1b[33m4\x1b[0m Haute  \x1b[35m3\x1b[0m Moyenne  \x1b[90m2\x1b[0m Basse  \x1b[90m1\x1b[0m Mini");
-    let val = read_field("  Ton choix", Some("3"));
+    println!("  \x1b[90mPriority:\x1b[0m");
+    println!("  \x1b[31m5\x1b[0m Urgent  \x1b[33m4\x1b[0m High  \x1b[35m3\x1b[0m Medium  \x1b[90m2\x1b[0m Low  \x1b[90m1\x1b[0m Minimal");
+    let val = read_field("  Your choice", Some("3"));
     parse_priority(&val)
 }
 
@@ -583,10 +583,10 @@ fn parse_priority(s: &str) -> Priority {
 }
 
 fn read_deadline() -> NaiveDateTime {
-    let s = read_field("  Deadline (AAAA-MM-JJ HH:MM)", Some("2026-12-31 23:59"));
+    let s = read_field("  Deadline (YYYY-MM-DD HH:MM)", Some("2026-12-31 23:59"));
     NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M")
         .unwrap_or_else(|_| {
-            println!("  \x1b[90mFormat invalide → date par défaut\x1b[0m");
+            println!("  \x1b[90mInvalid format → using default date\x1b[0m");
             NaiveDateTime::parse_from_str("2026-12-31 23:59", "%Y-%m-%d %H:%M").unwrap()
         })
 }
@@ -596,11 +596,15 @@ fn restore_tui() {
     execute!(io::stdout(), EnterAlternateScreen).ok();
 }
 
-// ─── WRAPPERS COMPATIBILITÉ ──────────────────────────────────────────────────
+// ─── BACKWARD-COMPATIBLE WRAPPERS ────────────────────────────────────────────
+// These wrappers allow main.rs to keep calling the old signatures
+// without breaking anything.
+
 pub fn display_task_list(tasks: &[Task]) {
-    println!("  \x1b[35m✦ MA LISTE DE TÂCHES\x1b[0m");
+    // Text fallback if ratatui is not available
+    println!("  \x1b[35m✦ MY TASK LIST\x1b[0m");
     if tasks.is_empty() {
-        println!("  (Aucune tâche)");
+        println!("  (No tasks)");
         return;
     }
     for (i, t) in tasks.iter().enumerate() {
@@ -614,7 +618,7 @@ pub fn display_task_list(tasks: &[Task]) {
 
 pub fn prompt_new_task() -> Task {
     prompt_new_task_tui().unwrap_or_else(|| Task {
-        name: "Sans titre".to_string(),
+        name: "Untitled".to_string(),
         description: String::new(),
         duration: Duration::minutes(30),
         priority: Priority::Three,
@@ -626,13 +630,9 @@ pub fn prompt_new_task() -> Task {
 
 pub fn prompt_delete_task(max: usize) -> Option<usize> {
     if max == 0 { return None; }
-    print!("  \x1b[35mIndex à supprimer (1-{})\x1b[0m : ", max);
+    print!("  \x1b[35mIndex to delete (1-{})\x1b[0m : ", max);
     io::stdout().flush().unwrap();
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     input.trim().parse::<usize>().ok().map(|i| i - 1)
-}
-
-pub fn prompt_modify_task(task: &mut Task) {
-    prompt_modify_task_tui(task);
 }
