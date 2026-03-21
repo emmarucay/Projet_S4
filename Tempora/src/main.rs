@@ -5,7 +5,7 @@ mod ui;
 mod progress;
 
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -39,6 +39,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
 
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
             match &state.screen {
 
                 Screen::Welcome => match key.code {
