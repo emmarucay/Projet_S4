@@ -256,7 +256,7 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
                 let name_style = if task.completed {
                     Style::default().fg(MUTED).add_modifier(Modifier::CROSSED_OUT)
                 } else {
-                    Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)
+                    Style::default().fg(WHITE).add_modifier(Modifier::BOLD)
                 };
 
                 let statut = if task.completed { " ✓" } else { "" };
@@ -374,10 +374,14 @@ pub fn prompt_modify_task_tui(task: &mut Task) {
     println!();
 
     let new_name = read_field(&format!("  Name [{}]", task.name), None);
-    if !new_name.is_empty() { task.name = new_name; }
+    if !new_name.is_empty() {
+        task.name = new_name;
+    }
 
     let new_desc = read_field(&format!("  Description [{}]", task.description), None);
-    if !new_desc.is_empty() { task.description = new_desc; }
+    if !new_desc.is_empty() {
+        task.description = new_desc;
+    }
 
     println!("  Current priority: \x1b[35m{}\x1b[0m", priority_label(&task.priority));
     let new_prio_str = read_field("  New priority (1-5, Enter = keep)", None);
@@ -388,7 +392,25 @@ pub fn prompt_modify_task_tui(task: &mut Task) {
     let cats_str = task.categories.join(", ");
     let new_cats = read_field(&format!("  Categories [{}]", cats_str), None);
     if !new_cats.is_empty() {
-        task.categories = new_cats.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        task.categories = new_cats
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+
+    let current_status = if task.completed { "yes" } else { "no" };
+    let new_completed = read_field(
+        &format!("  Completed? (yes/no) [{}]", current_status),
+        None,
+    );
+
+    if !new_completed.is_empty() {
+        match new_completed.trim().to_lowercase().as_str() {
+            "yes" | "y" | "true" | "1" => task.completed = true,
+            "no" | "n" | "false" | "0" => task.completed = false,
+            _ => {}
+        }
     }
 
     println!("\n  \x1b[35m✦ Task updated!\x1b[0m");
@@ -514,6 +536,11 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
             Span::styled("  Categories  ", Style::default().fg(MUTED)),
             Span::styled(format!("{}", categories.len()), Style::default().fg(SOFT).add_modifier(Modifier::BOLD)),
         ]),
+        Line::from(""),
+Line::from(vec![
+    Span::styled("  Progress     ", Style::default().fg(MUTED)),
+    Span::styled(format!("{:.0}%", _progression), Style::default().fg(DEEP_PINK).add_modifier(Modifier::BOLD)),
+]),
     ];
 
     let stats_widget = Paragraph::new(stats_text)
