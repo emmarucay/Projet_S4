@@ -1,17 +1,17 @@
 use chrono::{ NaiveDateTime, Duration};
 //NaiveDateTime, it's used to have a date and time without worrying about the time zone
 //Duration, used to have a duration of, say, 30 minutes, 1 hour
-
+use serde:: {Serialize, Deserialize};
 
 ///Main structure to manage tasks and events
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Manager
 {
     pub tasks: Vec<Task>,
     pub events: Vec<Event>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Priority
 {
     One = 1,
@@ -21,7 +21,7 @@ pub enum Priority
     Five = 5,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Task
 {
     pub name: String,
@@ -33,7 +33,7 @@ pub struct Task
     pub completed: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Event
 {
     pub name: String,
