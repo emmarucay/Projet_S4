@@ -83,7 +83,7 @@ impl Manager
         }
     }
 
-    ///Returns tasks that are due in the next hour
+    /*///Returns tasks that are due in the next hour
     pub fn get_upcoming_tasks(&self, now: NaiveDateTime) -> Vec<&Task>
     {
         let one_hour_late = now + Duration::hours(1);
@@ -91,6 +91,6 @@ impl Manager
             .iter()
             .filter(|t| t.deadline > now && t.deadline <= one_hour_late)
             .collect()
-    }
+    }*/
 }
 
