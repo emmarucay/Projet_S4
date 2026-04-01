@@ -3,6 +3,7 @@ mod logic;
 mod filters;
 mod ui;
 mod progress;
+mod storage;
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -23,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut manager = Manager::new();
+    let mut manager = storage::load_from_file("tasks.json").unwrap_or_else(|_|{ Manager::new()});
     let mut state   = AppState::new();
     let mut filter_cat = String::new();
 
@@ -173,6 +174,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }
         }
+    }
+    
+    if let Err(e) = storage::save_to_file(&manager, "tasks.json")
+    {
+        eprintln!("Erreur lors de la sauvegarde : {}", e);
     }
 
     disable_raw_mode()?;
