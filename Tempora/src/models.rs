@@ -82,7 +82,7 @@ impl Manager
             println!("{}: {} (Priority: {:?}) - Due: {}", i+1, task.name, task.priority, task.deadline);
         }
     }
-    #[allow(dead_code)]
+
     ///Returns tasks that are due in the next hour
     pub fn get_upcoming_tasks(&self, now: NaiveDateTime) -> Vec<&Task>
     {
