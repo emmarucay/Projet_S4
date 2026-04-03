@@ -22,6 +22,7 @@ const SOFT:       Color = Color::LightMagenta;
 const MUTED:      Color = Color::DarkGray;
 const WHITE:      Color = Color::White;
 const LAVENDER:   Color = Color::LightBlue;
+#[allow(dead_code)]
 const BG:         Color = Color::Reset;
 
 // ─── APP STATE ───────────────────────────────────────────────────────────────
@@ -59,11 +60,11 @@ impl AppState {
 // ─── STYLE HELPERS ───────────────────────────────────────────────────────────
 fn priority_color(p: &Priority) -> Color {
     match p {
-        Priority::Five => DEEP_PINK,
-        Priority::Four => Color::LightRed,
+        Priority::Five  => DEEP_PINK,
+        Priority::Four  => Color::LightRed,
         Priority::Three => PINK,
-        Priority::Two  => SOFT,
-        Priority::One  => MUTED,
+        Priority::Two   => SOFT,
+        Priority::One   => MUTED,
     }
 }
 
@@ -79,14 +80,11 @@ fn priority_label(p: &Priority) -> &'static str {
 
 fn priority_dot(p: &Priority) -> &'static str {
     match p {
-        Priority::Five  => "●",
-        Priority::Four  => "●",
-        Priority::Three => "●",
-        Priority::Two   => "○",
-        Priority::One   => "○",
+        Priority::Five | Priority::Four | Priority::Three => "●",
+        Priority::Two  | Priority::One                    => "○",
     }
 }
-
+#[allow(dead_code)]
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -107,6 +105,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 // ─── WELCOME SCREEN ───────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     let area = f.size();
 
@@ -125,12 +124,7 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  ✦  ", Style::default().fg(SOFT)),
-            Span::styled(
-                "T E M P O R A",
-                Style::default()
-                    .fg(PINK)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Span::styled("T E M P O R A", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
             Span::styled("  ✦  ", Style::default().fg(SOFT)),
         ]),
         Line::from(""),
@@ -141,20 +135,14 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
             ),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  · · · · · · · · · · · · · · · · · · · ·  ", Style::default().fg(SOFT)),
-        ]),
+        Line::from(Span::styled("  · · · · · · · · · · · · · · · · · · · ·  ", Style::default().fg(SOFT))),
     ];
 
     let title = Paragraph::new(title_text)
         .alignment(Alignment::Center)
-        .block(
-            Block::default()
-                .borders(Borders::NONE),
-        );
+        .block(Block::default().borders(Borders::NONE));
     f.render_widget(title, chunks[0]);
 
-    // ── OPTIONS ──
     let menu_items = vec![
         ("  ✅  My tasks        ", "View, sort and manage your tasks"),
         ("  ✍   Add task        ", "Create a new task"),
@@ -185,14 +173,9 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
             } else {
                 Style::default().fg(SOFT)
             };
-            let desc_style = Style::default().fg(MUTED);
             ListItem::new(vec![
-                Line::from(vec![
-                    Span::styled(format!("{}{}", prefix, label), style),
-                ]),
-                Line::from(vec![
-                    Span::styled(format!("   {}", desc), desc_style),
-                ]),
+                Line::from(Span::styled(format!("{}{}", prefix, label), style)),
+                Line::from(Span::styled(format!("   {}", desc), Style::default().fg(MUTED))),
                 Line::from(""),
             ])
         })
@@ -208,7 +191,6 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
         );
     f.render_widget(menu, cols[1]);
 
-    // ── FOOTER ──
     let footer = Paragraph::new(vec![
         Line::from(""),
         Line::from(vec![
@@ -217,18 +199,17 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
             Span::styled("  q quit  ", Style::default().fg(MUTED)),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "  Made with ♡ by Marilyn · Emma · Lisa · Farah  ",
-                Style::default().fg(SOFT).add_modifier(Modifier::ITALIC),
-            ),
-        ]),
+        Line::from(Span::styled(
+            "  Made with ♡ by Marilyn · Emma · Lisa · Farah  ",
+            Style::default().fg(SOFT).add_modifier(Modifier::ITALIC),
+        )),
     ])
     .alignment(Alignment::Center);
     f.render_widget(footer, chunks[2]);
 }
 
 // ─── TASK LIST SCREEN ────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
     let area = f.size();
 
@@ -241,7 +222,6 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
         ])
         .split(area);
 
-    // Header
     let header = Paragraph::new(vec![Line::from(vec![
         Span::styled("  ✦ TEMPORA  ", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
         Span::styled("›  ", Style::default().fg(MUTED)),
@@ -277,28 +257,25 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
             .map(|(i, task)| {
                 let dot_color = priority_color(&task.priority);
                 let is_sel = state.list_state.selected() == Some(i);
-
                 let prefix = if is_sel { "▶ " } else { "  " };
-                let name_style = if is_sel {
-                    Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)
+
+                // Nom en noir + barré si terminée
+                let name_style = if task.completed {
+                    Style::default().fg(MUTED).add_modifier(Modifier::CROSSED_OUT)
                 } else {
-                    Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)
+                    Style::default().fg(WHITE).add_modifier(Modifier::BOLD)
                 };
+
+                let statut = if task.completed { " ✓" } else { "" };
 
                 ListItem::new(vec![
                     Line::from(vec![
                         Span::styled(prefix, Style::default().fg(PINK)),
-                        Span::styled(
-                            priority_dot(&task.priority),
-                            Style::default().fg(dot_color),
-                        ),
+                        Span::styled(priority_dot(&task.priority), Style::default().fg(dot_color)),
                         Span::raw("  "),
-                        Span::styled(task.name.clone(), name_style),
+                        Span::styled(format!("{}{}", task.name, statut), name_style),
                         Span::raw("   "),
-                        Span::styled(
-                            priority_label(&task.priority),
-                            Style::default().fg(dot_color),
-                        ),
+                        Span::styled(priority_label(&task.priority), Style::default().fg(dot_color)),
                     ]),
                     Line::from(vec![
                         Span::raw("     "),
@@ -313,10 +290,7 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
                             format!("📅 {}  ", task.deadline.format("%d/%m/%Y %H:%M")),
                             Style::default().fg(LAVENDER),
                         ),
-                        Span::styled(
-                            task.categories.join(" · "),
-                            Style::default().fg(SOFT),
-                        ),
+                        Span::styled(task.categories.join(" · "), Style::default().fg(SOFT)),
                     ]),
                     Line::from(Span::styled(
                         "  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─",
@@ -337,7 +311,6 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
         f.render_stateful_widget(list, chunks[1], &mut state.list_state);
     }
 
-    // Footer
     let footer = Paragraph::new(Line::from(vec![
         Span::styled("  a add  ", Style::default().fg(MUTED)),
         Span::styled("  s sort  ", Style::default().fg(MUTED)),
@@ -355,6 +328,7 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
 // Interactive input stays in text mode (stdin) because ratatui and stdin
 // don't mix easily without an async lib. We exit raw mode,
 // read input, then come back.
+#[allow(dead_code)]
 pub fn prompt_new_task_tui() -> Option<Task> {
     // Temporarily exit raw mode to read from terminal
     disable_raw_mode().ok();
@@ -390,9 +364,12 @@ pub fn prompt_new_task_tui() -> Option<Task> {
         priority: prio,
         deadline: date,
         categories,
+        completed: false,
     })
 }
 
+// ─── MODIFIER UNE TÂCHE ──────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn prompt_modify_task_tui(task: &mut Task) {
     disable_raw_mode().ok();
     execute!(io::stdout(), LeaveAlternateScreen).ok();
@@ -404,10 +381,14 @@ pub fn prompt_modify_task_tui(task: &mut Task) {
     println!();
 
     let new_name = read_field(&format!("  Name [{}]", task.name), None);
-    if !new_name.is_empty() { task.name = new_name; }
+    if !new_name.is_empty() {
+        task.name = new_name;
+    }
 
     let new_desc = read_field(&format!("  Description [{}]", task.description), None);
-    if !new_desc.is_empty() { task.description = new_desc; }
+    if !new_desc.is_empty() {
+        task.description = new_desc;
+    }
 
     println!("  Current priority: \x1b[35m{}\x1b[0m", priority_label(&task.priority));
     let new_prio_str = read_field("  New priority (1-5, Enter = keep)", None);
@@ -418,7 +399,25 @@ pub fn prompt_modify_task_tui(task: &mut Task) {
     let cats_str = task.categories.join(", ");
     let new_cats = read_field(&format!("  Categories [{}]", cats_str), None);
     if !new_cats.is_empty() {
-        task.categories = new_cats.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        task.categories = new_cats
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+
+    let current_status = if task.completed { "yes" } else { "no" };
+    let new_completed = read_field(
+        &format!("  Completed? (yes/no) [{}]", current_status),
+        None,
+    );
+
+    if !new_completed.is_empty() {
+        match new_completed.trim().to_lowercase().as_str() {
+            "yes" | "y" | "true" | "1" => task.completed = true,
+            "no" | "n" | "false" | "0" => task.completed = false,
+            _ => {}
+        }
     }
 
     println!("\n  \x1b[35m✦ Task updated!\x1b[0m");
@@ -486,6 +485,7 @@ pub fn prompt_new_event_tui() -> Option<crate::models::Event> {
 }
 
 // ─── FILTER SCREEN ───────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
     let area = f.size();
     let chunks = Layout::default()
@@ -518,7 +518,7 @@ pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
             ListItem::new(vec![
                 Line::from(vec![
                     Span::styled("  ● ", Style::default().fg(priority_color(&t.priority))),
-                    Span::styled(t.name.clone(), Style::default().fg(WHITE).add_modifier(Modifier::BOLD)),
+                    Span::styled(t.name.clone(), Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)),
                     Span::raw("   "),
                     Span::styled(priority_label(&t.priority), Style::default().fg(priority_color(&t.priority))),
                 ]),
@@ -530,8 +530,7 @@ pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
             ])
         }).collect();
 
-        let list = List::new(items)
-            .block(Block::default().borders(Borders::NONE));
+        let list = List::new(items).block(Block::default().borders(Borders::NONE));
         f.render_widget(list, chunks[1]);
     }
 
@@ -544,6 +543,7 @@ pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
 }
 
 // ─── STATS SCREEN ────────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
     let area = f.size();
 
@@ -560,12 +560,16 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
     .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(SOFT)));
     f.render_widget(header, chunks[0]);
 
-    let total = tasks.len();
-    let urgentes = tasks.iter().filter(|t| matches!(t.priority, Priority::Five)).count();
+    let total     = tasks.len();
+    let terminees = tasks.iter().filter(|t| t.completed).count();
+    let urgentes  = tasks.iter().filter(|t| matches!(t.priority, Priority::Five)).count();
     let categories: std::collections::HashSet<&str> = tasks
         .iter()
         .flat_map(|t| t.categories.iter().map(|c| c.as_str()))
         .collect();
+
+    // Progression (feature Farah)
+   let _progression = if total > 0 { (terminees as f64 / total as f64) * 100.0 } else { 0.0 };
 
     let prio_counts: Vec<(String, usize, Color)> = vec![
         ("★★★★★ Urgent ".to_string(), tasks.iter().filter(|t| matches!(t.priority, Priority::Five)).count(), DEEP_PINK),
@@ -584,7 +588,7 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
     let stats_text = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Total       ", Style::default().fg(MUTED)),
+            Span::styled("  Total        ", Style::default().fg(MUTED)),
             Span::styled(format!("{}", total), Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
             Span::styled(" task(s)", Style::default().fg(MUTED)),
         ]),
@@ -598,6 +602,11 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
             Span::styled("  Categories  ", Style::default().fg(MUTED)),
             Span::styled(format!("{}", categories.len()), Style::default().fg(SOFT).add_modifier(Modifier::BOLD)),
         ]),
+        Line::from(""),
+Line::from(vec![
+    Span::styled("  Progress     ", Style::default().fg(MUTED)),
+    Span::styled(format!("{:.0}%", _progression), Style::default().fg(DEEP_PINK).add_modifier(Modifier::BOLD)),
+]),
     ];
 
     let stats_widget = Paragraph::new(stats_text)
@@ -647,6 +656,7 @@ pub fn draw_stats(f: &mut Frame, tasks: &[Task]) {
 }
 
 // ─── UTILITY FUNCTIONS ───────────────────────────────────────────────────────
+#[allow(dead_code)]
 fn read_field(prompt: &str, default: Option<&str>) -> String {
     print!("\x1b[35m{}\x1b[0m : ", prompt);
     io::stdout().flush().unwrap();
@@ -662,14 +672,17 @@ fn read_priority() -> Priority {
     let val = read_field("  Your choice", Some("3"));
     parse_priority(&val)
 }
-
 fn parse_priority(s: &str) -> Priority {
     match s.trim() {
         "5" => Priority::Five,
         "4" => Priority::Four,
+        "3" => Priority::Three,
         "2" => Priority::Two,
         "1" => Priority::One,
-        _   => Priority::Three,
+        _ => {
+            println!("  \x1b[90mInvalid priority → using default priority 3\x1b[0m");  //test securitaire
+            Priority::Three
+        }
     }
 }
 
@@ -690,7 +703,7 @@ fn restore_tui() {
 // ─── BACKWARD-COMPATIBLE WRAPPERS ────────────────────────────────────────────
 // These wrappers allow main.rs to keep calling the old signatures
 // without breaking anything.
-
+#[allow(dead_code)]
 pub fn display_task_list(tasks: &[Task]) {
     // Text fallback if ratatui is not available
     println!("  \x1b[35m✦ MY TASK LIST\x1b[0m");
@@ -699,13 +712,14 @@ pub fn display_task_list(tasks: &[Task]) {
         return;
     }
     for (i, t) in tasks.iter().enumerate() {
-        println!("  {}. \x1b[35m[{:?}]\x1b[0m {}", i + 1, t.priority, t.name);
+        let statut = if t.completed { "✓ Terminée" } else { "À faire" };
+        println!("  {}. \x1b[35m[{:?}]\x1b[0m {} - {}", i + 1, t.priority, t.name, statut);
         println!("     {}", t.description);
         println!("     📅 {}  |  {}", t.deadline.format("%d/%m/%Y"), t.categories.join(", "));
         println!();
     }
 }
-
+#[allow(dead_code)]
 pub fn prompt_new_task() -> Task {
     prompt_new_task_tui().unwrap_or_else(|| Task {
         name: "Untitled".to_string(),
@@ -714,347 +728,31 @@ pub fn prompt_new_task() -> Task {
         priority: Priority::Three,
         deadline: NaiveDateTime::parse_from_str("2026-12-31 23:59", "%Y-%m-%d %H:%M").unwrap(),
         categories: vec![],
+        completed: false,
     })
 }
-
+#[allow(dead_code)]
 pub fn prompt_delete_task(max: usize) -> Option<usize> {
-    if max == 0 { return None; }
+    if max == 0 {
+        println!("Aucune tâche à supprimer.");
+        return None;
+    }
+
     print!("  \x1b[35mIndex to delete (1-{})\x1b[0m : ", max);
     io::stdout().flush().unwrap();
+
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    input.trim().parse::<usize>().ok().map(|i| i - 1)
-}
-// ─── CALENDAR SCREEN ─────────────────────────────────────────────────────────
-// Vue mois : grille 7 colonnes (Lun→Dim), affiche les tâches et événements
-// dont la deadline / date de début tombe dans le jour.
-use chrono::{Datelike, NaiveDate};
-use crate::models::Event;
 
-pub fn draw_calendar(
-    f: &mut Frame,
-    tasks: &[Task],
-    events: &[Event],
-    cal_state: &CalendarState,
-) {
-    let area = f.size();
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),  // header
-            Constraint::Length(3),  // jours de la semaine
-            Constraint::Min(0),     // grille
-            Constraint::Length(3),  // footer
-        ])
-        .split(area);
-
-    // ── Header ──
-    let month_name = month_label(cal_state.month);
-    let header = Paragraph::new(Line::from(vec![
-        Span::styled("  ✦ TEMPORA  ", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
-        Span::styled("›  ", Style::default().fg(MUTED)),
-        Span::styled("Calendar  ", Style::default().fg(WHITE).add_modifier(Modifier::BOLD)),
-        Span::styled(
-            format!("{}  {}", month_name, cal_state.year),
-            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled("   h l change month", Style::default().fg(MUTED)),
-    ]))
-    .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(SOFT)));
-    f.render_widget(header, chunks[0]);
-
-    // ── Jours de la semaine ──
-    let day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    let col_constraints: Vec<Constraint> = (0..7).map(|_| Constraint::Ratio(1, 7)).collect();
-    let day_cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(col_constraints.clone())
-        .split(chunks[1]);
-
-    for (i, name) in day_names.iter().enumerate() {
-        let style = if i >= 5 {
-            Style::default().fg(SOFT).add_modifier(Modifier::BOLD) // weekend
-        } else {
-            Style::default().fg(MUTED).add_modifier(Modifier::BOLD)
-        };
-        let p = Paragraph::new(Line::from(Span::styled(format!("  {}", name), style)))
-            .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(MUTED)));
-        f.render_widget(p, day_cols[i]);
-    }
-
-    // ── Grille des jours ──
-    let first_day = NaiveDate::from_ymd_opt(cal_state.year, cal_state.month, 1).unwrap();
-    // Weekday en index 0=Lun … 6=Dim
-    let start_offset = first_day.weekday().num_days_from_monday() as usize;
-    let days_in_month = days_in_month(cal_state.year, cal_state.month);
-
-    // On calcule le nombre de lignes nécessaires
-    let total_cells = start_offset + days_in_month as usize;
-    let nb_rows = (total_cells + 6) / 7;
-
-    let row_constraints: Vec<Constraint> = (0..nb_rows).map(|_| Constraint::Ratio(1, nb_rows as u32)).collect();
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(row_constraints)
-        .split(chunks[2]);
-
-    let today = chrono::Local::now().date_naive();
-
-    for row in 0..nb_rows {
-        let col_areas = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(col_constraints.clone())
-            .split(rows[row]);
-
-        for col in 0..7usize {
-            let cell_idx = row * 7 + col;
-            if cell_idx < start_offset || cell_idx >= start_offset + days_in_month as usize {
-                // Cellule vide (avant ou après le mois)
-                let empty = Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::DarkGray));
-                f.render_widget(empty, col_areas[col]);
-                continue;
-            }
-
-            let day_num = (cell_idx - start_offset + 1) as u32;
-            let this_date = NaiveDate::from_ymd_opt(cal_state.year, cal_state.month, day_num).unwrap();
-
-            // Compter tâches et événements ce jour
-            let task_count = tasks.iter().filter(|t| t.deadline.date() == this_date).count();
-            let event_count = events.iter().filter(|e| e.start.date() == this_date).count();
-
-            let is_today = this_date == today;
-            let is_selected = cal_state.selected_day == Some(day_num);
-
-            // Style de la bordure selon l'état
-            let border_style = if is_selected {
-                Style::default().fg(PINK)
-            } else if is_today {
-                Style::default().fg(LAVENDER)
-            } else {
-                Style::default().fg(Color::DarkGray)
-            };
-
-            let day_style = if is_today {
-                Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD)
-            } else if col >= 5 {
-                Style::default().fg(SOFT)  // weekend
-            } else {
-                Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)
-            };
-
-            // Construire le contenu de la cellule
-            let mut lines = vec![
-                Line::from(Span::styled(format!(" {:2}", day_num), day_style)),
-            ];
-
-            if task_count > 0 {
-                lines.push(Line::from(vec![
-                    Span::styled(" ● ", Style::default().fg(PINK)),
-                    Span::styled(
-                        format!("{} task{}", task_count, if task_count > 1 { "s" } else { "" }),
-                        Style::default().fg(MUTED),
-                    ),
-                ]));
-            }
-            if event_count > 0 {
-                lines.push(Line::from(vec![
-                    Span::styled(" ◆ ", Style::default().fg(LAVENDER)),
-                    Span::styled(
-                        format!("{} event{}", event_count, if event_count > 1 { "s" } else { "" }),
-                        Style::default().fg(MUTED),
-                    ),
-                ]));
-            }
-
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(if is_selected { BorderType::Thick } else { BorderType::Plain })
-                .border_style(border_style);
-
-            let cell_widget = Paragraph::new(lines).block(block);
-            f.render_widget(cell_widget, col_areas[col]);
+    match input.trim().parse::<usize>() {
+        Ok(i) if i >= 1 && i <= max => Some(i - 1),
+        Ok(_) => {
+            println!("Index hors limites.");
+            None
         }
-    }
-
-    // ── Footer ──
-    let footer = Paragraph::new(Line::from(vec![
-        Span::styled("  h l month  ", Style::default().fg(MUTED)),
-        Span::styled("  ↑↓ -> <- day  ", Style::default().fg(MUTED)),
-        Span::styled("  Enter details  ", Style::default().fg(SOFT)),
-        Span::styled("  esc back  ", Style::default().fg(MUTED)),
-    ]))
-    .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
-    f.render_widget(footer, chunks[3]);
-}
-
-// ─── VUE DÉTAIL D'UN JOUR ────────────────────────────────────────────────────
-// S'affiche quand on appuie sur Entrée sur un jour du calendrier
-pub fn draw_day_detail(
-    f: &mut Frame,
-    tasks: &[Task],
-    events: &[Event],
-    date: NaiveDate,
-) {
-    let area = f.size();
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)])
-        .split(area);
-
-    // Header
-    let header = Paragraph::new(Line::from(vec![
-        Span::styled("  ✦ TEMPORA  ", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
-        Span::styled("›  Calendar  ›  ", Style::default().fg(MUTED)),
-        Span::styled(
-            format!("{}", date.format("%A %d %B %Y")),
-            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
-        ),
-    ]))
-    .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(SOFT)));
-    f.render_widget(header, chunks[0]);
-
-    // Contenu : tâches + événements du jour
-    let day_tasks: Vec<&Task>  = tasks.iter().filter(|t| t.deadline.date() == date).collect();
-    let day_events: Vec<&Event> = events.iter().filter(|e| e.start.date() == date).collect();
-
-    let mut lines: Vec<Line> = vec![Line::from("")];
-
-    if day_tasks.is_empty() && day_events.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "  Nothing planned for this day 🌸",
-            Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
-        )));
-    }
-
-    if !day_tasks.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "  ● Tasks",
-            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
-        )));
-        lines.push(Line::from(""));
-        for t in &day_tasks {
-            lines.push(Line::from(vec![
-                Span::styled("    ", Style::default()),
-                Span::styled("● ", Style::default().fg(priority_color(&t.priority))),
-                Span::styled(t.name.clone(), Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)),
-                Span::styled(format!("  {}", priority_label(&t.priority)), Style::default().fg(priority_color(&t.priority))),
-            ]));
-            lines.push(Line::from(vec![
-                Span::raw("      "),
-                Span::styled(
-                    format!("⏰ {}  |  {}", t.deadline.format("%H:%M"), t.categories.join(", ")),
-                    Style::default().fg(MUTED),
-                ),
-            ]));
-            lines.push(Line::from(""));
+        Err(_) => {
+            println!("Veuillez entrer un nombre valide.");
+            None
         }
-    }
-
-    if !day_events.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "  ◆ Events",
-            Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD),
-        )));
-        lines.push(Line::from(""));
-        for e in &day_events {
-            lines.push(Line::from(vec![
-                Span::raw("    "),
-                Span::styled("◆ ", Style::default().fg(LAVENDER)),
-                Span::styled(e.name.clone(), Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)),
-            ]));
-            lines.push(Line::from(vec![
-                Span::raw("      "),
-                Span::styled(
-                    format!("⏰ {} → {}  |  {}", e.start.format("%H:%M"), e.end.format("%H:%M"), e.categories.join(", ")),
-                    Style::default().fg(MUTED),
-                ),
-            ]));
-            if !e.description.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::raw("      "),
-                    Span::styled(e.description.chars().take(60).collect::<String>(), Style::default().fg(MUTED)),
-                ]));
-            }
-            lines.push(Line::from(""));
-        }
-    }
-
-    let content = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::NONE));
-    f.render_widget(content, chunks[1]);
-
-    let footer = Paragraph::new(Line::from(Span::styled(
-        "  esc back to calendar",
-        Style::default().fg(MUTED),
-    )))
-    .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
-    f.render_widget(footer, chunks[2]);
-}
-
-// ─── ÉTAT DU CALENDRIER ──────────────────────────────────────────────────────
-pub struct CalendarState {
-    pub year:         i32,
-    pub month:        u32,
-    pub selected_day: Option<u32>,
-}
-
-impl CalendarState {
-    pub fn new() -> Self {
-        let now = chrono::Local::now();
-        Self {
-            year:         now.year(),
-            month:        now.month(),
-            selected_day: Some(now.day()),
-        }
-    }
-
-    pub fn prev_month(&mut self) {
-        if self.month == 1 {
-            self.month = 12;
-            self.year -= 1;
-        } else {
-            self.month -= 1;
-        }
-        self.selected_day = Some(1);
-    }
-
-    pub fn next_month(&mut self) {
-        if self.month == 12 {
-            self.month = 1;
-            self.year += 1;
-        } else {
-            self.month += 1;
-        }
-        self.selected_day = Some(1);
-    }
-
-    pub fn move_day(&mut self, delta: i32) {
-        let max = days_in_month(self.year, self.month);
-        let cur = self.selected_day.unwrap_or(1) as i32;
-        let next = (cur + delta).clamp(1, max as i32) as u32;
-        self.selected_day = Some(next);
-    }
-}
-
-// ─── HELPERS CALENDRIER ──────────────────────────────────────────────────────
-fn days_in_month(year: i32, month: u32) -> u32 {
-    let next_month = if month == 12 { 1 } else { month + 1 };
-    let next_year  = if month == 12 { year + 1 } else { year };
-    NaiveDate::from_ymd_opt(next_year, next_month, 1)
-        .unwrap()
-        .signed_duration_since(NaiveDate::from_ymd_opt(year, month, 1).unwrap())
-        .num_days() as u32
-}
-
-fn month_label(month: u32) -> &'static str {
-    match month {
-        1  => "January",   2  => "February", 3  => "March",
-        4  => "April",     5  => "May",       6  => "June",
-        7  => "July",      8  => "August",    9  => "September",
-        10 => "October",   11 => "November",  12 => "December",
-        _  => "?",
     }
 }

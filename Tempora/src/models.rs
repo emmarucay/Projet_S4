@@ -1,17 +1,17 @@
 use chrono::{ NaiveDateTime, Duration};
 //NaiveDateTime, it's used to have a date and time without worrying about the time zone
 //Duration, used to have a duration of, say, 30 minutes, 1 hour
-
+use serde:: {Serialize, Deserialize};
 
 ///Main structure to manage tasks and events
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Manager
 {
     pub tasks: Vec<Task>,
     pub events: Vec<Event>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Priority
 {
     One = 1,
@@ -21,7 +21,7 @@ pub enum Priority
     Five = 5,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Task
 {
     pub name: String,
@@ -30,9 +30,10 @@ pub struct Task
     pub priority : Priority,
     pub deadline: NaiveDateTime,
     pub categories: Vec<String>,
+    pub completed: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Event
 {
     pub name: String,
@@ -59,7 +60,7 @@ impl Manager
     {
         self.tasks.push(task);
     }
-
+    #[allow(dead_code)]
     ///Adds a new event to manager
     pub fn add_event(&mut self, event: Event) -> Result<(), String>
     {
@@ -73,7 +74,7 @@ impl Manager
             Err("The event must end after it has started.".to_string())
         }
     }
-
+    #[allow(dead_code)]
     pub fn display_tasks(&self)
     {
         for (i, task) in self.tasks.iter().enumerate()
@@ -82,7 +83,7 @@ impl Manager
         }
     }
 
-    ///Returns tasks that are due in the next hour
+    /*///Returns tasks that are due in the next hour
     pub fn get_upcoming_tasks(&self, now: NaiveDateTime) -> Vec<&Task>
     {
         let one_hour_late = now + Duration::hours(1);
@@ -90,6 +91,6 @@ impl Manager
             .iter()
             .filter(|t| t.deadline > now && t.deadline <= one_hour_late)
             .collect()
-    }
+    }*/
 }
 
