@@ -2,11 +2,9 @@ mod models;
 mod logic;
 mod filters;
 mod ui;
-mod progress;
-mod storage;
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
+    event::{self, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -24,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut manager = storage::load_from_file("tasks.json").unwrap_or_else(|_|{ Manager::new()});
+    let mut manager = Manager::new();
     let mut state   = AppState::new();
     let mut filter_cat = String::new();
 
@@ -35,14 +33,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Screen::TaskList         => ui::draw_task_list(f, &manager.tasks, &mut state),
                 Screen::FilterByCategory => ui::draw_filter_screen(f, &manager.tasks, &filter_cat),
                 Screen::Stats            => ui::draw_stats(f, &manager.tasks),
-                Screen::AddTask          => {}
+                Screen::Calendar         => ui::draw_calendar(f, &manager.tasks, &manager.events, &state.cal_state),
+                Screen::DayDetail        => {
+                    if let Some(day) = state.cal_state.selected_day {
+                        let date = chrono::NaiveDate::from_ymd_opt(
+                            state.cal_state.year,
+                            state.cal_state.month,
+                            day,
+                        ).unwrap();
+                        ui::draw_day_detail(f, &manager.tasks, &manager.events, date);
+                    }
+                }
+                Screen::AddTask  => {}
+                Screen::AddEvent => {}
             }
         })?;
 
         if let Event::Key(key) = event::read()? {
-            if key.kind != KeyEventKind::Press {
-                continue;
-            }
             match &state.screen {
 
                 Screen::Welcome => match key.code {
@@ -51,10 +58,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Enter => match state.selected_menu {
                         0 => state.screen = Screen::TaskList,
                         1 => state.screen = Screen::AddTask,
-                        2 => {
+                        2 => state.screen = Screen::AddEvent,
+                        3 => {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                            print!("\n  \x1b[35mCategory to filter\x1b[0m : ");
+                            print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
                             io::Write::flush(&mut io::stdout())?;
                             let mut cat = String::new();
                             io::BufRead::read_line(&mut io::BufReader::new(io::stdin()), &mut cat)?;
@@ -62,12 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             enable_raw_mode()?;
                             execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                             terminal.clear()?;
-
-                            if filter_cat.is_empty() {
-                                state.screen = Screen::TaskList;
-                            } else {
-                                state.screen = Screen::FilterByCategory;
-                            }
+                            state.screen = Screen::FilterByCategory;
                         }
                         4 => state.screen = Screen::Calendar,
                         5 => state.screen = Screen::Stats,
@@ -95,17 +98,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     KeyCode::Char('s') => {
                         sort_tasks(&mut manager.tasks);
-                        if manager.tasks.is_empty() {
-                            state.list_state.select(None);
-                        } else {
-                            state.list_state.select(Some(0));
-                        }
+                        state.list_state.select(Some(0));
                     }
 
-                  KeyCode::Char('f') => {
+                    KeyCode::Char('f') => {
                         disable_raw_mode()?;
                         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                        print!("\n  \x1b[35mCategory to filter\x1b[0m : ");
+                        print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
                         io::Write::flush(&mut io::stdout())?;
                         let mut cat = String::new();
                         io::stdin().read_line(&mut cat)?;
@@ -113,12 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         enable_raw_mode()?;
                         execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                         terminal.clear()?;
-
-                        if filter_cat.is_empty() { //secure test
-                            state.screen = Screen::TaskList;
-                        } else {
-                            state.screen = Screen::FilterByCategory;
-                        }
+                        state.screen = Screen::FilterByCategory;
                     }
 
                     KeyCode::Char('e') => {
@@ -130,15 +124,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 enable_raw_mode()?;
                                 execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                                 terminal.clear()?;
-                            }
-                        }
-                    }
-
-                    // Espace = marquer terminée/à faire (feature Farah)
-                    KeyCode::Char(' ') => {
-                        if let Some(idx) = state.list_state.selected() {
-                            if idx < manager.tasks.len() {
-                                manager.tasks[idx].completed = !manager.tasks[idx].completed;
                             }
                         }
                     }
@@ -165,6 +150,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                     terminal.clear()?;
                     state.screen = Screen::TaskList;
+                }
+
+                Screen::AddEvent => {
+                    disable_raw_mode()?;
+                    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                    if let Some(event) = ui::prompt_new_event_tui() {
+                        let _ = manager.add_event(event);
+                    }
+                    enable_raw_mode()?;
+                    execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                    terminal.clear()?;
+                    state.screen = Screen::Calendar;
                 }
 
                 Screen::FilterByCategory | Screen::Stats => match key.code {
@@ -195,11 +192,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }
         }
-    }
-    
-    if let Err(e) = storage::save_to_file(&manager, "tasks.json")
-    {
-        eprintln!("Erreur lors de la sauvegarde : {}", e);
     }
 
     disable_raw_mode()?;
