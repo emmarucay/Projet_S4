@@ -16,7 +16,6 @@ use logic::sort_tasks;
 use ui::{AppState, Screen};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // ── Setup terminal ──
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -27,33 +26,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut state   = AppState::new();
     let mut filter_cat = String::new();
 
-    // ── Boucle principale ──
     loop {
         terminal.draw(|f| {
             match &state.screen {
-                Screen::Welcome        => ui::draw_welcome(f, &state),
-                Screen::TaskList       => ui::draw_task_list(f, &manager.tasks, &mut state),
+                Screen::Welcome          => ui::draw_welcome(f, &state),
+                Screen::TaskList         => ui::draw_task_list(f, &manager.tasks, &mut state),
                 Screen::FilterByCategory => ui::draw_filter_screen(f, &manager.tasks, &filter_cat),
-                Screen::Stats          => ui::draw_stats(f, &manager.tasks),
-                Screen::AddTask        => {} // géré hors draw (saisie stdin)
+                Screen::Stats            => ui::draw_stats(f, &manager.tasks),
+                Screen::Calendar         => ui::draw_calendar(f, &manager.tasks, &manager.events, &state.cal_state),
+                Screen::DayDetail        => {
+                    if let Some(day) = state.cal_state.selected_day {
+                        let date = chrono::NaiveDate::from_ymd_opt(
+                            state.cal_state.year,
+                            state.cal_state.month,
+                            day,
+                        ).unwrap();
+                        ui::draw_day_detail(f, &manager.tasks, &manager.events, date);
+                    }
+                }
+                Screen::AddTask  => {}
+                Screen::AddEvent => {}
             }
         })?;
 
         if let Event::Key(key) = event::read()? {
             match &state.screen {
 
-                // ── WELCOME ──
                 Screen::Welcome => match key.code {
                     KeyCode::Up   => { if state.selected_menu > 0 { state.selected_menu -= 1; } }
-                    KeyCode::Down => { if state.selected_menu < 4 { state.selected_menu += 1; } }
+                    KeyCode::Down => { if state.selected_menu < 6 { state.selected_menu += 1; } }
                     KeyCode::Enter => match state.selected_menu {
                         0 => state.screen = Screen::TaskList,
-                        1 => {
-                            // Saisie → on quitte raw, on lit, on revient
-                            state.screen = Screen::AddTask;
-                        }
-                        2 => {
-                            // Demander la catégorie puis afficher
+                        1 => state.screen = Screen::AddTask,
+                        2 => state.screen = Screen::AddEvent,
+                        3 => {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
                             print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
@@ -66,15 +72,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             terminal.clear()?;
                             state.screen = Screen::FilterByCategory;
                         }
-                        3 => state.screen = Screen::Stats,
-                        4 => break,
+                        4 => state.screen = Screen::Calendar,
+                        5 => state.screen = Screen::Stats,
+                        6 => break,
                         _ => {}
                     },
                     KeyCode::Char('q') => break,
                     _ => {}
                 },
 
-                // ── LISTE TÂCHES ──
                 Screen::TaskList => match key.code {
                     KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::Welcome,
                     KeyCode::Char('q') => break,
@@ -134,7 +140,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 },
 
-                // ── ADD TASK ──
                 Screen::AddTask => {
                     disable_raw_mode()?;
                     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -147,18 +152,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     state.screen = Screen::TaskList;
                 }
 
-                // ── FILTRE / STATS ──
+                Screen::AddEvent => {
+                    disable_raw_mode()?;
+                    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                    if let Some(event) = ui::prompt_new_event_tui() {
+                        let _ = manager.add_event(event);
+                    }
+                    enable_raw_mode()?;
+                    execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                    terminal.clear()?;
+                    state.screen = Screen::Calendar;
+                }
+
                 Screen::FilterByCategory | Screen::Stats => match key.code {
                     KeyCode::Esc | KeyCode::Char('b') | KeyCode::Char('q') => {
                         state.screen = Screen::TaskList;
                     }
                     _ => {}
                 },
+
+                Screen::Calendar => match key.code {
+                    KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::Welcome,
+                    KeyCode::Char('q') => break,
+                    KeyCode::Char('h') => state.cal_state.prev_month(),
+                    KeyCode::Char('l') => state.cal_state.next_month(),
+                    KeyCode::Up        => state.cal_state.move_day(-7),
+                    KeyCode::Down      => state.cal_state.move_day(7),
+                    KeyCode::Left      => state.cal_state.move_day(-1),
+                    KeyCode::Right     => state.cal_state.move_day(1),
+                    KeyCode::Char('e') => state.screen = Screen::AddEvent,
+                    KeyCode::Enter     => state.screen = Screen::DayDetail,
+                    _ => {}
+                },
+
+                Screen::DayDetail => match key.code {
+                    KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::Calendar,
+                    KeyCode::Char('q') => break,
+                    _ => {}
+                },
             }
         }
     }
 
-    // ── Cleanup ──
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     println!("  See you soon ! 🌸");

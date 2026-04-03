@@ -29,14 +29,18 @@ pub enum Screen {
     Welcome,
     TaskList,
     AddTask,
+    AddEvent,
     FilterByCategory,
     Stats,
+    Calendar,
+    DayDetail,
 }
 
 pub struct AppState {
     pub screen: Screen,
     pub list_state: ListState,
     pub selected_menu: usize,   // welcome menu index
+    pub cal_state: CalendarState,
 }
 
 impl AppState {
@@ -47,6 +51,7 @@ impl AppState {
             screen: Screen::Welcome,
             list_state,
             selected_menu: 0,
+            cal_state: CalendarState::new(),
         }
     }
 }
@@ -152,8 +157,10 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     // ── OPTIONS ──
     let menu_items = vec![
         ("  ✅  My tasks        ", "View, sort and manage your tasks"),
-        ("  ✍   Add             ", "Create a new task"),
+        ("  ✍   Add task        ", "Create a new task"),
+        ("  🗓   Add event       ", "Create a new event"),
         ("  🔍  Filter           ", "Find by category"),
+        ("  📅  Calendar         ", "Monthly view of tasks & events"),
         ("  📊  Stats            ", "Your progress"),
         ("  ✕   Quit             ", ""),
     ];
@@ -419,6 +426,65 @@ pub fn prompt_modify_task_tui(task: &mut Task) {
     restore_tui();
 }
 
+// helper : lit une date au format DD/MM/YYYY HH:MM
+fn read_datetime(prompt: &str, default: &str) -> NaiveDateTime {
+    let s = read_field(prompt, Some(default));
+    NaiveDateTime::parse_from_str(&s, "%d/%m/%Y %H:%M")
+        .unwrap_or_else(|_| {
+            println!("  \x1b[90mInvalid format → using default\x1b[0m");
+            NaiveDateTime::parse_from_str(default, "%d/%m/%Y %H:%M").unwrap()
+        })
+}
+
+// ─── AJOUTER UN ÉVÉNEMENT ────────────────────────────────────────────────────
+pub fn prompt_new_event_tui() -> Option<crate::models::Event> {
+    disable_raw_mode().ok();
+    execute!(io::stdout(), LeaveAlternateScreen).ok();
+
+    println!();
+    println!("  \x1b[35m✦  NEW EVENT\x1b[0m");
+    println!("  \x1b[90m─────────────────────────────\x1b[0m");
+
+    let name = read_field("  Event name", None);
+    if name.is_empty() {
+        restore_tui();
+        return None;
+    }
+
+    let desc = read_field("  Description", None);
+    let cats = read_field("  Categories (comma-separated)", Some("General"));
+    let categories: Vec<String> = cats
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    println!("  \x1b[90mStart date/time:\x1b[0m");
+    let start = read_datetime("  Start (DD/MM/YYYY HH:MM)", "01/01/2026 09:00");
+
+    println!("  \x1b[90mEnd date/time:\x1b[0m");
+    let end = read_datetime("  End   (DD/MM/YYYY HH:MM)", "01/01/2026 10:00");
+
+    if end <= start {
+        println!("  \x1b[31m⚠ End must be after start. Event not saved.\x1b[0m");
+        std::thread::sleep(std::time::Duration::from_millis(1200));
+        restore_tui();
+        return None;
+    }
+
+    let prio = read_priority();
+    restore_tui();
+
+    Some(crate::models::Event {
+        name,
+        description: desc,
+        start,
+        end,
+        priority: prio,
+        categories,
+    })
+}
+
 // ─── FILTER SCREEN ───────────────────────────────────────────────────────────
 pub fn draw_filter_screen(f: &mut Frame, tasks: &[Task], category: &str) {
     let area = f.size();
@@ -608,11 +674,11 @@ fn parse_priority(s: &str) -> Priority {
 }
 
 fn read_deadline() -> NaiveDateTime {
-    let s = read_field("  Deadline (YYYY-MM-DD HH:MM)", Some("2026-12-31 23:59"));
-    NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M")
+    let s = read_field("  Deadline (DD/MM/YYYY HH:MM)", Some("31/12/2026 23:59"));
+    NaiveDateTime::parse_from_str(&s, "%d/%m/%Y %H:%M")
         .unwrap_or_else(|_| {
             println!("  \x1b[90mInvalid format → using default date\x1b[0m");
-            NaiveDateTime::parse_from_str("2026-12-31 23:59", "%Y-%m-%d %H:%M").unwrap()
+            NaiveDateTime::parse_from_str("31/12/2026 23:59", "%d/%m/%Y %H:%M").unwrap()
         })
 }
 
@@ -658,4 +724,337 @@ pub fn prompt_delete_task(max: usize) -> Option<usize> {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     input.trim().parse::<usize>().ok().map(|i| i - 1)
+}
+// ─── CALENDAR SCREEN ─────────────────────────────────────────────────────────
+// Vue mois : grille 7 colonnes (Lun→Dim), affiche les tâches et événements
+// dont la deadline / date de début tombe dans le jour.
+use chrono::{Datelike, NaiveDate};
+use crate::models::Event;
+
+pub fn draw_calendar(
+    f: &mut Frame,
+    tasks: &[Task],
+    events: &[Event],
+    cal_state: &CalendarState,
+) {
+    let area = f.size();
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),  // header
+            Constraint::Length(3),  // jours de la semaine
+            Constraint::Min(0),     // grille
+            Constraint::Length(3),  // footer
+        ])
+        .split(area);
+
+    // ── Header ──
+    let month_name = month_label(cal_state.month);
+    let header = Paragraph::new(Line::from(vec![
+        Span::styled("  ✦ TEMPORA  ", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
+        Span::styled("›  ", Style::default().fg(MUTED)),
+        Span::styled("Calendar  ", Style::default().fg(WHITE).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{}  {}", month_name, cal_state.year),
+            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("   h l change month", Style::default().fg(MUTED)),
+    ]))
+    .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(SOFT)));
+    f.render_widget(header, chunks[0]);
+
+    // ── Jours de la semaine ──
+    let day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    let col_constraints: Vec<Constraint> = (0..7).map(|_| Constraint::Ratio(1, 7)).collect();
+    let day_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(col_constraints.clone())
+        .split(chunks[1]);
+
+    for (i, name) in day_names.iter().enumerate() {
+        let style = if i >= 5 {
+            Style::default().fg(SOFT).add_modifier(Modifier::BOLD) // weekend
+        } else {
+            Style::default().fg(MUTED).add_modifier(Modifier::BOLD)
+        };
+        let p = Paragraph::new(Line::from(Span::styled(format!("  {}", name), style)))
+            .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(MUTED)));
+        f.render_widget(p, day_cols[i]);
+    }
+
+    // ── Grille des jours ──
+    let first_day = NaiveDate::from_ymd_opt(cal_state.year, cal_state.month, 1).unwrap();
+    // Weekday en index 0=Lun … 6=Dim
+    let start_offset = first_day.weekday().num_days_from_monday() as usize;
+    let days_in_month = days_in_month(cal_state.year, cal_state.month);
+
+    // On calcule le nombre de lignes nécessaires
+    let total_cells = start_offset + days_in_month as usize;
+    let nb_rows = (total_cells + 6) / 7;
+
+    let row_constraints: Vec<Constraint> = (0..nb_rows).map(|_| Constraint::Ratio(1, nb_rows as u32)).collect();
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(row_constraints)
+        .split(chunks[2]);
+
+    let today = chrono::Local::now().date_naive();
+
+    for row in 0..nb_rows {
+        let col_areas = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(col_constraints.clone())
+            .split(rows[row]);
+
+        for col in 0..7usize {
+            let cell_idx = row * 7 + col;
+            if cell_idx < start_offset || cell_idx >= start_offset + days_in_month as usize {
+                // Cellule vide (avant ou après le mois)
+                let empty = Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray));
+                f.render_widget(empty, col_areas[col]);
+                continue;
+            }
+
+            let day_num = (cell_idx - start_offset + 1) as u32;
+            let this_date = NaiveDate::from_ymd_opt(cal_state.year, cal_state.month, day_num).unwrap();
+
+            // Compter tâches et événements ce jour
+            let task_count = tasks.iter().filter(|t| t.deadline.date() == this_date).count();
+            let event_count = events.iter().filter(|e| e.start.date() == this_date).count();
+
+            let is_today = this_date == today;
+            let is_selected = cal_state.selected_day == Some(day_num);
+
+            // Style de la bordure selon l'état
+            let border_style = if is_selected {
+                Style::default().fg(PINK)
+            } else if is_today {
+                Style::default().fg(LAVENDER)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+
+            let day_style = if is_today {
+                Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD)
+            } else if col >= 5 {
+                Style::default().fg(SOFT)  // weekend
+            } else {
+                Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)
+            };
+
+            // Construire le contenu de la cellule
+            let mut lines = vec![
+                Line::from(Span::styled(format!(" {:2}", day_num), day_style)),
+            ];
+
+            if task_count > 0 {
+                lines.push(Line::from(vec![
+                    Span::styled(" ● ", Style::default().fg(PINK)),
+                    Span::styled(
+                        format!("{} task{}", task_count, if task_count > 1 { "s" } else { "" }),
+                        Style::default().fg(MUTED),
+                    ),
+                ]));
+            }
+            if event_count > 0 {
+                lines.push(Line::from(vec![
+                    Span::styled(" ◆ ", Style::default().fg(LAVENDER)),
+                    Span::styled(
+                        format!("{} event{}", event_count, if event_count > 1 { "s" } else { "" }),
+                        Style::default().fg(MUTED),
+                    ),
+                ]));
+            }
+
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .border_type(if is_selected { BorderType::Thick } else { BorderType::Plain })
+                .border_style(border_style);
+
+            let cell_widget = Paragraph::new(lines).block(block);
+            f.render_widget(cell_widget, col_areas[col]);
+        }
+    }
+
+    // ── Footer ──
+    let footer = Paragraph::new(Line::from(vec![
+        Span::styled("  h l month  ", Style::default().fg(MUTED)),
+        Span::styled("  ↑↓ -> <- day  ", Style::default().fg(MUTED)),
+        Span::styled("  Enter details  ", Style::default().fg(SOFT)),
+        Span::styled("  esc back  ", Style::default().fg(MUTED)),
+    ]))
+    .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
+    f.render_widget(footer, chunks[3]);
+}
+
+// ─── VUE DÉTAIL D'UN JOUR ────────────────────────────────────────────────────
+// S'affiche quand on appuie sur Entrée sur un jour du calendrier
+pub fn draw_day_detail(
+    f: &mut Frame,
+    tasks: &[Task],
+    events: &[Event],
+    date: NaiveDate,
+) {
+    let area = f.size();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)])
+        .split(area);
+
+    // Header
+    let header = Paragraph::new(Line::from(vec![
+        Span::styled("  ✦ TEMPORA  ", Style::default().fg(PINK).add_modifier(Modifier::BOLD)),
+        Span::styled("›  Calendar  ›  ", Style::default().fg(MUTED)),
+        Span::styled(
+            format!("{}", date.format("%A %d %B %Y")),
+            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
+        ),
+    ]))
+    .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(SOFT)));
+    f.render_widget(header, chunks[0]);
+
+    // Contenu : tâches + événements du jour
+    let day_tasks: Vec<&Task>  = tasks.iter().filter(|t| t.deadline.date() == date).collect();
+    let day_events: Vec<&Event> = events.iter().filter(|e| e.start.date() == date).collect();
+
+    let mut lines: Vec<Line> = vec![Line::from("")];
+
+    if day_tasks.is_empty() && day_events.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  Nothing planned for this day 🌸",
+            Style::default().fg(MUTED).add_modifier(Modifier::ITALIC),
+        )));
+    }
+
+    if !day_tasks.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  ● Tasks",
+            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(""));
+        for t in &day_tasks {
+            lines.push(Line::from(vec![
+                Span::styled("    ", Style::default()),
+                Span::styled("● ", Style::default().fg(priority_color(&t.priority))),
+                Span::styled(t.name.clone(), Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)),
+                Span::styled(format!("  {}", priority_label(&t.priority)), Style::default().fg(priority_color(&t.priority))),
+            ]));
+            lines.push(Line::from(vec![
+                Span::raw("      "),
+                Span::styled(
+                    format!("⏰ {}  |  {}", t.deadline.format("%H:%M"), t.categories.join(", ")),
+                    Style::default().fg(MUTED),
+                ),
+            ]));
+            lines.push(Line::from(""));
+        }
+    }
+
+    if !day_events.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  ◆ Events",
+            Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(""));
+        for e in &day_events {
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled("◆ ", Style::default().fg(LAVENDER)),
+                Span::styled(e.name.clone(), Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)),
+            ]));
+            lines.push(Line::from(vec![
+                Span::raw("      "),
+                Span::styled(
+                    format!("⏰ {} → {}  |  {}", e.start.format("%H:%M"), e.end.format("%H:%M"), e.categories.join(", ")),
+                    Style::default().fg(MUTED),
+                ),
+            ]));
+            if !e.description.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::raw("      "),
+                    Span::styled(e.description.chars().take(60).collect::<String>(), Style::default().fg(MUTED)),
+                ]));
+            }
+            lines.push(Line::from(""));
+        }
+    }
+
+    let content = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(content, chunks[1]);
+
+    let footer = Paragraph::new(Line::from(Span::styled(
+        "  esc back to calendar",
+        Style::default().fg(MUTED),
+    )))
+    .block(Block::default().borders(Borders::TOP).border_style(Style::default().fg(SOFT)));
+    f.render_widget(footer, chunks[2]);
+}
+
+// ─── ÉTAT DU CALENDRIER ──────────────────────────────────────────────────────
+pub struct CalendarState {
+    pub year:         i32,
+    pub month:        u32,
+    pub selected_day: Option<u32>,
+}
+
+impl CalendarState {
+    pub fn new() -> Self {
+        let now = chrono::Local::now();
+        Self {
+            year:         now.year(),
+            month:        now.month(),
+            selected_day: Some(now.day()),
+        }
+    }
+
+    pub fn prev_month(&mut self) {
+        if self.month == 1 {
+            self.month = 12;
+            self.year -= 1;
+        } else {
+            self.month -= 1;
+        }
+        self.selected_day = Some(1);
+    }
+
+    pub fn next_month(&mut self) {
+        if self.month == 12 {
+            self.month = 1;
+            self.year += 1;
+        } else {
+            self.month += 1;
+        }
+        self.selected_day = Some(1);
+    }
+
+    pub fn move_day(&mut self, delta: i32) {
+        let max = days_in_month(self.year, self.month);
+        let cur = self.selected_day.unwrap_or(1) as i32;
+        let next = (cur + delta).clamp(1, max as i32) as u32;
+        self.selected_day = Some(next);
+    }
+}
+
+// ─── HELPERS CALENDRIER ──────────────────────────────────────────────────────
+fn days_in_month(year: i32, month: u32) -> u32 {
+    let next_month = if month == 12 { 1 } else { month + 1 };
+    let next_year  = if month == 12 { year + 1 } else { year };
+    NaiveDate::from_ymd_opt(next_year, next_month, 1)
+        .unwrap()
+        .signed_duration_since(NaiveDate::from_ymd_opt(year, month, 1).unwrap())
+        .num_days() as u32
+}
+
+fn month_label(month: u32) -> &'static str {
+    match month {
+        1  => "January",   2  => "February", 3  => "March",
+        4  => "April",     5  => "May",       6  => "June",
+        7  => "July",      8  => "August",    9  => "September",
+        10 => "October",   11 => "November",  12 => "December",
+        _  => "?",
+    }
 }
