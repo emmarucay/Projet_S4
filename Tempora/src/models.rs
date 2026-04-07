@@ -44,6 +44,12 @@ pub struct Event
     pub categories: Vec<String>,
 }
 
+impl Event {
+    ///Checks whether two events overlap in time
+    pub fn conflicts_with(&self, other: &Event) -> bool {
+        self.start < other.end && self.end > other.start
+    }
+}
 
 impl Manager
 {
@@ -64,15 +70,23 @@ impl Manager
     ///Adds a new event to manager
     pub fn add_event(&mut self, event: Event) -> Result<(), String>
     {
-        if event.end > event.start
+        // Check that the event is valid
+        if event.end <= event.start 
         {
-            self.events.push(event);
-            Ok(())
+            return Err("The event must end after it has started.".to_string());
         }
-        else
+
+        // Check if the event overlaps with an existing one
+        if let Some(conflict) = self.events.iter().find(|e| e.conflicts_with(&event)) 
         {
-            Err("The event must end after it has started.".to_string())
+            return Err(format!(
+                "Conflict with event '{}' ({} -> {})",
+                conflict.name, conflict.start, conflict.end
+            ));
         }
+
+        self.events.push(event);
+        Ok(())
     }
     #[allow(dead_code)]
     pub fn display_tasks(&self)
@@ -94,3 +108,39 @@ impl Manager
     }*/
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDateTime;
+
+    fn dt(s: &str) -> NaiveDateTime {
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M").unwrap()
+    }
+
+    #[test]
+    fn test_event_conflict() {
+        let mut manager = Manager::new();
+
+        let e1 = Event {
+            name: "Cours".to_string(),
+            description: "".to_string(),
+            start: dt("2026-04-07 14:00"),
+            end: dt("2026-04-07 15:00"),
+            priority: Priority::Three,
+            categories: vec![],
+        };
+
+        let e2 = Event {
+            name: "Médecin".to_string(),
+            description: "".to_string(),
+            start: dt("2026-04-07 14:30"),
+            end: dt("2026-04-07 15:30"),
+            priority: Priority::Three,
+            categories: vec![],
+        };
+
+        assert!(manager.add_event(e1).is_ok());
+        assert!(manager.add_event(e2).is_err()); // DOIT échouer
+    }
+}

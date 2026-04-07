@@ -4,7 +4,7 @@ mod filters;
 mod ui;
 
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -23,18 +23,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut manager = Manager::new();
-    let mut state   = AppState::new();
+    let mut state = AppState::new();
     let mut filter_cat = String::new();
 
     loop {
         terminal.draw(|f| {
             match &state.screen {
-                Screen::Welcome          => ui::draw_welcome(f, &state),
-                Screen::TaskList         => ui::draw_task_list(f, &manager.tasks, &mut state),
+                Screen::Welcome => ui::draw_welcome(f, &state),
+                Screen::TaskList => ui::draw_task_list(f, &manager.tasks, &mut state),
                 Screen::FilterByCategory => ui::draw_filter_screen(f, &manager.tasks, &filter_cat),
-                Screen::Stats            => ui::draw_stats(f, &manager.tasks),
-                Screen::Calendar         => ui::draw_calendar(f, &manager.tasks, &manager.events, &state.cal_state),
-                Screen::DayDetail        => {
+                Screen::Stats => ui::draw_stats(f, &manager.tasks),
+                Screen::Calendar => ui::draw_calendar(f, &manager.tasks, &manager.events, &state.cal_state),
+                Screen::DayDetail => {
                     if let Some(day) = state.cal_state.selected_day {
                         let date = chrono::NaiveDate::from_ymd_opt(
                             state.cal_state.year,
@@ -44,158 +44,245 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ui::draw_day_detail(f, &manager.tasks, &manager.events, date);
                     }
                 }
-                Screen::AddTask  => {}
+                Screen::AddTask => {}
                 Screen::AddEvent => {}
             }
         })?;
 
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+
             match &state.screen {
 
+                // ───── MENU  ─────
                 Screen::Welcome => match key.code {
-                    KeyCode::Up   => { if state.selected_menu > 0 { state.selected_menu -= 1; } }
-                    KeyCode::Down => { if state.selected_menu < 6 { state.selected_menu += 1; } }
+                    KeyCode::Up => {
+                        if state.selected_menu > 0 {
+                            state.selected_menu -= 1;
+                        }
+                    }
+                    KeyCode::Down => {
+                        if state.selected_menu < 6 {
+                            state.selected_menu += 1;
+                        }
+                    }
+
                     KeyCode::Enter => match state.selected_menu {
+
                         0 => state.screen = Screen::TaskList,
-                        1 => state.screen = Screen::AddTask,
-                        2 => state.screen = Screen::AddEvent,
-                        3 => {
+
+                        // ADD TASK
+                        1 => {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                            print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
-                            io::Write::flush(&mut io::stdout())?;
-                            let mut cat = String::new();
-                            io::BufRead::read_line(&mut io::BufReader::new(io::stdin()), &mut cat)?;
-                            filter_cat = cat.trim().to_string();
+
+                            if let Some(task) = ui::prompt_new_task_tui() {
+                                manager.add_task(task);
+                                println!("\x1b[32m\nEvent added successfully\x1b[0m");
+                            }
+
+                            std::thread::sleep(std::time::Duration::from_millis(1200));
+
                             enable_raw_mode()?;
                             execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                             terminal.clear()?;
-                            state.screen = Screen::FilterByCategory;
                         }
+
+                        // ADD EVENT (TA PARTIE)
+                        2 => {
+                            disable_raw_mode()?;
+                            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+
+                            loop {
+                                if let Some(event) = ui::prompt_new_event_tui() {
+
+                                    match manager.add_event(event) {
+
+                                        Ok(_) => {
+                                            println!("\x1b[32m\nEvent added successfully\x1b[0m");
+                                            std::thread::sleep(std::time::Duration::from_millis(1200));
+                                            break;
+                                        }
+
+                                        Err(e) => {
+                                            println!("\x1b[31m");
+                                            println!("Unable to add this event.");
+                                            println!("\x1b[0m");
+
+                                            std::thread::sleep(std::time::Duration::from_millis(2500));
+                                        }
+                                    }
+
+                                } else {
+                                    println!("Event canceled");
+                                    break;
+                                }
+                            }
+
+                            enable_raw_mode()?;
+                            execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                            terminal.clear()?;
+                        }
+
+                        // FILTER
+                        3 => {
+                            disable_raw_mode()?;
+                            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+
+                            print!("\nCategory to filter: ");
+                            io::Write::flush(&mut io::stdout())?;
+
+                            let mut cat = String::new();
+                            io::stdin().read_line(&mut cat)?;
+                            filter_cat = cat.trim().to_string();
+
+                            enable_raw_mode()?;
+                            execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                            terminal.clear()?;
+
+                            if filter_cat.is_empty() {
+                                state.screen = Screen::TaskList;
+                            } else {
+                                state.screen = Screen::FilterByCategory;
+                            }
+                        }
+
                         4 => state.screen = Screen::Calendar,
                         5 => state.screen = Screen::Stats,
                         6 => break,
                         _ => {}
                     },
+
                     KeyCode::Char('q') => break,
                     _ => {}
                 },
 
+                // ───── TASK LIST ─────
                 Screen::TaskList => match key.code {
                     KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::Welcome,
                     KeyCode::Char('q') => break,
 
                     KeyCode::Up => {
                         let sel = state.list_state.selected().unwrap_or(0);
-                        if sel > 0 { state.list_state.select(Some(sel - 1)); }
-                    }
-                    KeyCode::Down => {
-                        let sel = state.list_state.selected().unwrap_or(0);
-                        if sel + 1 < manager.tasks.len() { state.list_state.select(Some(sel + 1)); }
+                        if sel > 0 {
+                            state.list_state.select(Some(sel - 1));
+                        }
                     }
 
-                    KeyCode::Char('a') => state.screen = Screen::AddTask,
+                    KeyCode::Down => {
+                        let sel = state.list_state.selected().unwrap_or(0);
+                        if sel + 1 < manager.tasks.len() {
+                            state.list_state.select(Some(sel + 1));
+                        }
+                    }
+
+                    KeyCode::Char('a') => {
+                        disable_raw_mode()?;
+                        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+
+                        if let Some(task) = ui::prompt_new_task_tui() {
+                            manager.add_task(task);
+                            println!("\x1b[32m\nEvent added successfully.\x1b[0m");
+                        }
+
+                        std::thread::sleep(std::time::Duration::from_millis(1200));
+
+                        enable_raw_mode()?;
+                        execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                        terminal.clear()?;
+                    }
 
                     KeyCode::Char('s') => {
                         sort_tasks(&mut manager.tasks);
                         state.list_state.select(Some(0));
                     }
 
-                    KeyCode::Char('f') => {
-                        disable_raw_mode()?;
-                        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                        print!("\n  \x1b[35mCatégorie à filtrer\x1b[0m : ");
-                        io::Write::flush(&mut io::stdout())?;
-                        let mut cat = String::new();
-                        io::stdin().read_line(&mut cat)?;
-                        filter_cat = cat.trim().to_string();
-                        enable_raw_mode()?;
-                        execute!(terminal.backend_mut(), EnterAlternateScreen)?;
-                        terminal.clear()?;
-                        state.screen = Screen::FilterByCategory;
-                    }
-
-                    KeyCode::Char('e') => {
-                        if let Some(idx) = state.list_state.selected() {
-                            if idx < manager.tasks.len() {
-                                disable_raw_mode()?;
-                                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                                ui::prompt_modify_task_tui(&mut manager.tasks[idx]);
-                                enable_raw_mode()?;
-                                execute!(terminal.backend_mut(), EnterAlternateScreen)?;
-                                terminal.clear()?;
-                            }
-                        }
-                    }
-
                     KeyCode::Delete | KeyCode::Backspace => {
                         if let Some(idx) = state.list_state.selected() {
                             if idx < manager.tasks.len() {
                                 manager.tasks.remove(idx);
-                                let new_sel = if idx > 0 { idx - 1 } else { 0 };
-                                state.list_state.select(if manager.tasks.is_empty() { None } else { Some(new_sel) });
                             }
                         }
                     }
+
                     _ => {}
                 },
 
-                Screen::AddTask => {
-                    disable_raw_mode()?;
-                    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                    if let Some(task) = ui::prompt_new_task_tui() {
-                        manager.add_task(task);
-                    }
-                    enable_raw_mode()?;
-                    execute!(terminal.backend_mut(), EnterAlternateScreen)?;
-                    terminal.clear()?;
-                    state.screen = Screen::TaskList;
-                }
-
-                Screen::AddEvent => {
-                    disable_raw_mode()?;
-                    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                    if let Some(event) = ui::prompt_new_event_tui() {
-                        let _ = manager.add_event(event);
-                    }
-                    enable_raw_mode()?;
-                    execute!(terminal.backend_mut(), EnterAlternateScreen)?;
-                    terminal.clear()?;
-                    state.screen = Screen::Calendar;
-                }
-
-                Screen::FilterByCategory | Screen::Stats => match key.code {
-                    KeyCode::Esc | KeyCode::Char('b') | KeyCode::Char('q') => {
-                        state.screen = Screen::TaskList;
-                    }
-                    _ => {}
-                },
-
+                // ───── CALENDAR ─────
                 Screen::Calendar => match key.code {
                     KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::Welcome,
                     KeyCode::Char('q') => break,
+
                     KeyCode::Char('h') => state.cal_state.prev_month(),
                     KeyCode::Char('l') => state.cal_state.next_month(),
-                    KeyCode::Up        => state.cal_state.move_day(-7),
-                    KeyCode::Down      => state.cal_state.move_day(7),
-                    KeyCode::Left      => state.cal_state.move_day(-1),
-                    KeyCode::Right     => state.cal_state.move_day(1),
-                    KeyCode::Char('e') => state.screen = Screen::AddEvent,
-                    KeyCode::Enter     => state.screen = Screen::DayDetail,
+                    KeyCode::Up => state.cal_state.move_day(-7),
+                    KeyCode::Down => state.cal_state.move_day(7),
+                    KeyCode::Left => state.cal_state.move_day(-1),
+                    KeyCode::Right => state.cal_state.move_day(1),
+
+                    KeyCode::Char('e') => {
+                        disable_raw_mode()?;
+                        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+
+                        loop {
+                            if let Some(event) = ui::prompt_new_event_tui() {
+
+                                match manager.add_event(event) {
+
+                                    Ok(_) => {
+                                        println!("\x1b[32m\nEvent added successfully\x1b[0m");
+                                        std::thread::sleep(std::time::Duration::from_millis(1200));
+                                        break;
+                                    }
+
+                                    Err(e) => {
+                                        println!("\x1b[31m");
+                                        println!("Unable to add this event.");
+                                        println!("\x1b[0m");
+
+                                        std::thread::sleep(std::time::Duration::from_millis(2500));
+                                    }
+                                }
+
+                            } else {
+                                println!("Event canceled");
+                                break;
+                            }
+                        }
+
+                        enable_raw_mode()?;
+                        execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                        terminal.clear()?;
+                    }
+
+                    KeyCode::Enter => state.screen = Screen::DayDetail,
                     _ => {}
                 },
 
+                // ───── DAY DETAIL ─────
                 Screen::DayDetail => match key.code {
                     KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::Calendar,
                     KeyCode::Char('q') => break,
                     _ => {}
                 },
+
+                // ───── AUTRES ─────
+                Screen::FilterByCategory | Screen::Stats => match key.code {
+                    KeyCode::Esc | KeyCode::Char('b') => state.screen = Screen::TaskList,
+                    KeyCode::Char('q') => break,
+                    _ => {}
+                },
+
+                Screen::AddTask => state.screen = Screen::TaskList,
+                Screen::AddEvent => state.screen = Screen::TaskList,
             }
         }
     }
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    println!("  See you soon ! 🌸");
+    println!("See you soon! 🌸");
     Ok(())
 }
