@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             break;
                                         }
 
-                                        Err(e) => {
+                                        Err(_e) => {
                                             println!("\x1b[31m");
                                             println!("Unable to add this event.");
                                             println!("\x1b[0m");
@@ -242,7 +242,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         break;
                                     }
 
-                                    Err(e) => {
+                                    Err(_e) => {
                                         println!("\x1b[31m");
                                         println!("Unable to add this event.");
                                         println!("\x1b[0m");

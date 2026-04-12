@@ -22,9 +22,11 @@ const SOFT:       Color = Color::LightMagenta;
 const MUTED:      Color = Color::DarkGray;
 const WHITE:      Color = Color::White;
 const LAVENDER:   Color = Color::LightBlue;
+#[allow(dead_code)]
 const BG:         Color = Color::Reset;
 
 // ─── APP STATE ───────────────────────────────────────────────────────────────
+#[allow(dead_code)]
 pub enum Screen {
     Welcome,
     TaskList,
@@ -86,7 +88,7 @@ fn priority_dot(p: &Priority) -> &'static str {
         Priority::One   => "○",
     }
 }
-
+#[allow(dead_code)]
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -393,7 +395,7 @@ pub fn prompt_new_task_tui() -> Option<Task> {
         completed: false,
     })
 }
-
+#[allow(dead_code)]
 pub fn prompt_modify_task_tui(task: &mut Task) {
     disable_raw_mode().ok();
     execute!(io::stdout(), LeaveAlternateScreen).ok();
@@ -691,7 +693,7 @@ fn restore_tui() {
 // ─── BACKWARD-COMPATIBLE WRAPPERS ────────────────────────────────────────────
 // These wrappers allow main.rs to keep calling the old signatures
 // without breaking anything.
-
+#[allow(dead_code)]
 pub fn display_task_list(tasks: &[Task]) {
     // Text fallback if ratatui is not available
     println!("  \x1b[35m✦ MY TASK LIST\x1b[0m");
@@ -706,7 +708,7 @@ pub fn display_task_list(tasks: &[Task]) {
         println!();
     }
 }
-
+#[allow(dead_code)]
 pub fn prompt_new_task() -> Task {
     prompt_new_task_tui().unwrap_or_else(|| Task {
         name: "Untitled".to_string(),
@@ -718,7 +720,7 @@ pub fn prompt_new_task() -> Task {
         completed: false,
     })
 }
-
+#[allow(dead_code)]
 pub fn prompt_delete_task(max: usize) -> Option<usize> {
     if max == 0 { return None; }
     print!("  \x1b[35mIndex to delete (1-{})\x1b[0m : ", max);
