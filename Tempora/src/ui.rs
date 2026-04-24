@@ -282,11 +282,12 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
                 let is_sel = state.list_state.selected() == Some(i);
 
                 let prefix = if is_sel { "▶ " } else { "  " };
-                let name_style = if is_sel {
-                    Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)
+                let name_style = if task.completed {
+                    Style::default().fg(MUTED).add_modifier(Modifier::CROSSED_OUT)
                 } else {
                     Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)
                 };
+                let statut = if task.completed { " ✓" } else { "" };
 
                 ListItem::new(vec![
                     Line::from(vec![
@@ -296,7 +297,7 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
                             Style::default().fg(dot_color),
                         ),
                         Span::raw("  "),
-                        Span::styled(task.name.clone(), name_style),
+                        Span::styled(format!("{}{}", task.name, statut), name_style),
                         Span::raw("   "),
                         Span::styled(
                             priority_label(&task.priority),
@@ -346,6 +347,7 @@ pub fn draw_task_list(f: &mut Frame, tasks: &[Task], state: &mut AppState) {
         Span::styled("  s sort  ", Style::default().fg(MUTED)),
         Span::styled("  f filter  ", Style::default().fg(MUTED)),
         Span::styled("  e edit  ", Style::default().fg(MUTED)),
+        Span::styled("  espace ✓  ", Style::default().fg(SOFT)),
         Span::styled("  del delete  ", Style::default().fg(MUTED)),
         Span::styled("  esc back  ", Style::default().fg(MUTED)),
     ]))

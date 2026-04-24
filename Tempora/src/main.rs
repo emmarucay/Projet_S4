@@ -238,6 +238,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         terminal.clear()?;
                     }
 
+                    KeyCode::Char(' ') => {
+                        if let Some(idx) = state.list_state.selected() {
+                            if idx < manager.tasks.len() {
+                                manager.tasks[idx].completed = !manager.tasks[idx].completed;
+                            }
+                        }
+                    }
+
                     KeyCode::Char('s') => {
                         sort_tasks(&mut manager.tasks);
                         state.list_state.select(Some(0));
