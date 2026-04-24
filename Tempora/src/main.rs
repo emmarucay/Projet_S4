@@ -4,6 +4,9 @@ mod filters;
 mod ui;
 mod storage;
 mod progress;
+mod search;
+
+use search::search_tasks;
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -69,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     KeyCode::Down => {
-                        if state.selected_menu < 6 {
+                        if state.selected_menu < 7 {
                             state.selected_menu += 1;
                         }
                     }
@@ -153,10 +156,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 state.screen = Screen::FilterByCategory;
                             }
                         }
+                        4 => {
+                        disable_raw_mode()?;
+                        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
 
-                        4 => state.screen = Screen::Calendar,
-                        5 => state.screen = Screen::Stats,
-                        6 => break,
+                        print!("\nKeyword to search: ");
+                        io::Write::flush(&mut io::stdout())?;
+
+                        let mut keyword = String::new();
+                        io::stdin().read_line(&mut keyword)?;
+                        let keyword = keyword.trim().to_string();
+
+                        let results = search_tasks(&manager.tasks, &keyword);
+
+                        if keyword.is_empty() {
+                            println!("\nPlease enter a valid keyword.");
+                            std::thread::sleep(std::time::Duration::from_millis(1200));
+                        } else if results.is_empty() {
+                            println!("\nNo task found for this keyword.");
+                            std::thread::sleep(std::time::Duration::from_millis(1200));
+                        } else {
+                            let found_name = results[0].name.clone();
+
+                            if let Some(index) = manager.tasks.iter().position(|task| task.name == found_name) {
+                                state.list_state.select(Some(index));
+                            }
+
+                            println!("\nTask found: {}", found_name);
+                            std::thread::sleep(std::time::Duration::from_millis(1200));
+                        }
+
+                        enable_raw_mode()?;
+                        execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+                        terminal.clear()?;
+
+                        state.screen = Screen::TaskList;
+                    }
+
+                       5 => state.screen = Screen::Calendar,
+                        6 => state.screen = Screen::Stats,
+                        7 => break,
                         _ => {}
                     },
 

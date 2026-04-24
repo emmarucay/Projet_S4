@@ -162,6 +162,7 @@ pub fn draw_welcome(f: &mut Frame, state: &AppState) {
         ("  ✍   Add task        ", "Create a new task"),
         ("  🗓   Add event       ", "Create a new event"),
         ("  🔍  Filter           ", "Find by category"),
+        ("  🔎  Search          ", "Search by keyword"),
         ("  📅  Calendar         ", "Monthly view of tasks & events"),
         ("  📊  Stats            ", "Your progress"),
         ("  ✕   Quit             ", ""),
