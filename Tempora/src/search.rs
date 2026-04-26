@@ -1,6 +1,6 @@
 use crate::models::Task;
 
-// Recherche par mot-clé (nom, description, catégories)
+// Keyword search (name, description, categories)
 pub fn search_tasks<'a>(tasks: &'a [Task], keyword: &str) -> Vec<&'a Task> {
     let keyword = keyword.trim().to_lowercase();
 
