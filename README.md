@@ -9,7 +9,7 @@ List of commands to use Tempora:
     f : filter
     e : edit
     enter : confirm
-    delete : remove
+    escape : remove
     esc : back
 
 All other features and instructions are explained directly in the interface.
