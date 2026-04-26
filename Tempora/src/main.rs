@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             terminal.clear()?;
                         }
 
-                        // ADD EVENT (TA PARTIE)
+                        // ADD EVENT : temporal collision management
                         2 => {
                             disable_raw_mode()?;
                             execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     match manager.add_event(event) {
 
                                         Ok(_) => {
-                                            println!("\x1b[32m\nEvent added successfully\x1b[0m");
+                                            println!("\x1b[32m\nEvent added successfully.\x1b[0m");
                                             std::thread::sleep(std::time::Duration::from_millis(1200));
                                             break;
                                         }
@@ -123,8 +123,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         }
                                     }
 
-                                } else {
-                                    println!("Event canceled");
+                                } 
+                                else 
+                                {
+                                    println!("Event canceled.");
                                     break;
                                 }
                             }
@@ -150,7 +152,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             execute!(terminal.backend_mut(), EnterAlternateScreen)?;
                             terminal.clear()?;
 
-                            if filter_cat.is_empty() {
+                            if filter_cat.is_empty() 
+                            {
                                 state.screen = Screen::TaskList;
                             } else {
                                 state.screen = Screen::FilterByCategory;
