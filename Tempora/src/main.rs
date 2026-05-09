@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             if let Some(task) = ui::prompt_new_task_tui() {
                                 manager.add_task(task);
-                                println!("\x1b[32m\nEvent added successfully\x1b[0m");
+                                println!("\x1b[32m\nEvent added successfully.\x1b[0m");
                             }
 
                             std::thread::sleep(std::time::Duration::from_millis(1200));
