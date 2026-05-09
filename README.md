@@ -1,3 +1,10 @@
+
+
+## Installation
+
+Clone the repository: 
+
+
 To compile and run the program, go into the Tempora directory and execute:
 
     cargo run
