@@ -70,13 +70,13 @@ impl Manager
     ///Adds a new event to manager
     pub fn add_event(&mut self, event: Event) -> Result<(), String>
     {
-        // Check that the event is valid
+        // Check that the event is valid               
         if event.end <= event.start 
         {
             return Err("The event must end after it has started.".to_string());
         }
 
-        // Check if the event overlaps with an existing one
+        // Check if the event overlaps with an existing one         
         if let Some(conflict) = self.events.iter().find(|e| e.conflicts_with(&event)) 
         {
             return Err(format!(
