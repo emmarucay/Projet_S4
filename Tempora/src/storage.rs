@@ -22,4 +22,5 @@ pub fn load_from_file(filename: &str) -> Result<Manager, String>
     let manager: Manager = serde_json::from_str(&contents)
         .map_err(|e| e.to_string())?;
     Ok(manager)
+
 }
