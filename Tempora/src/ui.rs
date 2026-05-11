@@ -4,7 +4,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph},
     Frame,
-};
+};  
 use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -106,7 +106,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-// ─── WELCOME SCREEN ───────────────────────────────────────────────────────────
+// -─── WELCOME SCREEN ───────────────────────────────────────────────────────────
 pub fn draw_welcome(f: &mut Frame, state: &AppState) {
     let area = f.size();
 
